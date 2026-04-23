@@ -14,9 +14,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Testing (Explicitly requested to ignore)
-tests/
-jest.config.js
+# Testing
 coverage/
 testreport.txt
 .jest/
