@@ -1,5 +1,5 @@
 {
-  "name": "naturadry-backend",
+  "name": "server",
   "version": "1.0.0",
   "description": "Backend API for NaturaDry e-commerce platform",
   "main": "src/server.js",
