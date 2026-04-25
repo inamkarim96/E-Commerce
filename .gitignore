@@ -1,5 +1,8 @@
 # Dependency directories
 node_modules/
+package-lock.json
+**/package-lock.json
+yarn.lock
 
 # Environment variables
 .env
@@ -33,6 +36,10 @@ Thumbs.db
 tmp/
 temp/
 .antigravity/
+
+# Seeds
+server/seeds/
+**/seeds/
 
 # Build outputs (if any)
 dist/

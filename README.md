@@ -63,8 +63,7 @@ A premium, full-stack e-commerce solution for natural dried products. This platf
     ```bash
     cd ../client
     npm install
-    # Create .env and add:
-    # VITE_API_URL=http://localhost:5000/api
+    # Create .env 
     npm run dev
     ```
 
