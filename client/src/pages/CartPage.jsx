@@ -70,42 +70,47 @@ const CartPage = () => {
             </div>
 
             <div className="cart-items">
-              {cart.map((item, idx) => (
-                <motion.div
-                  key={`${item.id}-${item.selectedWeight}`}
-                  className="cart-item"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                >
-                  <div className="item-info">
-                    <div className="item-img">
-                      <img src={item.images?.[0] || 'https://via.placeholder.com/150'} alt={item.name} />
+              {cart.map((item, idx) => {
+                const weightLabel = typeof item.selectedWeight === 'string' ? item.selectedWeight : (item.selectedWeight?.label || 'Default');
+                const itemPrice = Number(item.price || item.base_price || 0);
+                
+                return (
+                  <motion.div
+                    key={`${item.id}-${weightLabel}`}
+                    className="cart-item"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
+                    <div className="item-info">
+                      <div className="item-img">
+                        <img src={item.images?.find(img => img && img.trim() !== '') || 'https://via.placeholder.com/150'} alt={item.name} />
+                      </div>
+                      <div className="item-details">
+                        <h3>{item.name}</h3>
+                        <span>Weight: {weightLabel}</span>
+                        <button className="remove-btn" onClick={() => removeFromCart(item.id, item.selectedWeight)}>
+                          <Trash2 size={16} /> Remove
+                        </button>
+                      </div>
                     </div>
-                    <div className="item-details">
-                      <h3>{item.name}</h3>
-                      <span>Weight: {item.selectedWeight}</span>
-                      <button className="remove-btn" onClick={() => removeFromCart(item.id, item.selectedWeight)}>
-                        <Trash2 size={16} /> Remove
-                      </button>
+
+                    <div className="item-price">PKR {itemPrice.toLocaleString()}</div>
+
+                    <div className="item-quantity">
+                      <div className="quantity-control">
+                        <button onClick={() => updateQuantity(item.id, item.selectedWeight, item.quantity - 1)}><Minus size={14} /></button>
+                        <span>{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, item.selectedWeight, item.quantity + 1)}><Plus size={14} /></button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="item-price">PKR {Number(item.base_price || item.price).toLocaleString()}</div>
-
-                  <div className="item-quantity">
-                    <div className="quantity-control">
-                      <button onClick={() => updateQuantity(item.id, item.selectedWeight, item.quantity - 1)}><Minus size={14} /></button>
-                      <span>{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, item.selectedWeight, item.quantity + 1)}><Plus size={14} /></button>
+                    <div className="item-total">
+                      PKR {(itemPrice * item.quantity).toLocaleString()}
                     </div>
-                  </div>
-
-                  <div className="item-total">
-                    PKR {Number((item.base_price || item.price) * item.quantity).toLocaleString()}
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
 
             <Link to="/shop" className="back-to-shop">

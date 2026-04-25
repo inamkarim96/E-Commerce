@@ -9,7 +9,7 @@ import { useCart } from '../context/CartContext';
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
-  const { addToCart } = useCart();
+  const { addToCart, cart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [selectedWeight, setSelectedWeight] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
@@ -24,7 +24,7 @@ const ProductDetailPage = () => {
         setLoading(true);
         const response = await productsApi.getProductBySlug(slug);
         if (response.success) {
-          const prodData = response.data;
+          const prodData = response.data.product; // Corrected data path
           setProduct(prodData);
           if (prodData.weight_variants && prodData.weight_variants.length > 0) {
             setSelectedWeight(prodData.weight_variants[0]);
@@ -51,6 +51,11 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, [slug]);
 
+  // Reset quantity when weight variant changes
+  useEffect(() => {
+    setQuantity(1);
+  }, [selectedWeight]);
+
   if (loading) return <div className="container" style={{ padding: '10rem 0', textAlign: 'center' }}>Loading product...</div>;
   if (error || !product) return <div className="container" style={{ padding: '10rem 0', textAlign: 'center' }}>{error || 'Product not found'}</div>;
 
@@ -68,10 +73,13 @@ const ProductDetailPage = () => {
         <div className="product-main">
           <div className="product-gallery">
             <div className="main-image">
-              <img src={product.images?.[0] || 'https://via.placeholder.com/600'} alt={product.name} />
+              <img 
+                src={product.images?.find(img => img && img.trim() !== '') || 'https://images.unsplash.com/photo-1596003906949-67221c37965c?auto=format&fit=crop&q=80&w=800'} 
+                alt={product.name} 
+              />
             </div>
             <div className="thumbnails">
-              {product.images?.map((img, index) => (
+              {product.images?.filter(img => img && img.trim() !== '').map((img, index) => (
                 <div key={index} className={`thumb ${index === 0 ? 'active' : ''}`}>
                   <img src={img} alt={`Thumbnail ${index}`} />
                 </div>
@@ -93,39 +101,85 @@ const ProductDetailPage = () => {
             </div>
 
             <div className="price-row">
-              <span className="current-price">PKR {Number(selectedWeight?.price || product.base_price).toLocaleString()}</span>
+              <span className="current-price">
+                PKR {Number(selectedWeight?.price || product.base_price || 0).toLocaleString()}
+              </span>
+              {selectedWeight && (
+                <span className="unit-price">({selectedWeight.label})</span>
+              )}
             </div>
 
             <p className="short-desc">{product.description}</p>
 
-            {product.weight_variants && product.weight_variants.length > 0 && (
+            <div className="stock-status-container">
+              {((selectedWeight ? selectedWeight.stock : product.stock) > 0) ? (
+                <span className="stock-pill in-stock">
+                  <ShieldCheck size={14} /> In Stock
+                </span>
+              ) : (
+                <span className="stock-pill out-of-stock">
+                   Out of Stock
+                </span>
+              )}
+              <span className="stock-count">
+                {(selectedWeight ? selectedWeight.stock : product.stock)} items available
+              </span>
+            </div>
+
+            {product.weight_variants && product.weight_variants.length > 0 ? (
               <div className="variant-section">
-                <h3>Select Weight:</h3>
+                <h3>Select Quantity / Weight:</h3>
                 <div className="weight-options">
-                  {product.weight_variants.map(variant => (
-                    <button
-                      key={variant.id}
-                      className={`weight-btn ${selectedWeight?.id === variant.id ? 'active' : ''}`}
-                      onClick={() => setSelectedWeight(variant)}
-                    >
-                      {variant.label}
-                    </button>
-                  ))}
+                  {product.weight_variants.map(variant => {
+                    const cartItem = cart.find(item => item.id === product.id && (item.selectedWeight?.label === variant.label || item.selectedWeight === variant.label));
+                    const inCartCount = cartItem?.quantity || 0;
+
+                    return (
+                      <button
+                        key={variant.id}
+                        className={`weight-btn ${selectedWeight?.id === variant.id ? 'active' : ''} ${variant.stock <= 0 ? 'disabled' : ''}`}
+                        onClick={() => variant.stock > 0 && setSelectedWeight(variant)}
+                        disabled={variant.stock <= 0}
+                      >
+                        {inCartCount > 0 && (
+                          <span className="in-cart-badge">{inCartCount} in cart</span>
+                        )}
+                        <span className="weight-label">{variant.label}</span>
+                        <span className="weight-price">PKR {Number(variant.price).toLocaleString()}</span>
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
+            ) : (
+              <div className="variant-section no-variants">
+                <p>Standard weight applies. Check stock below.</p>
               </div>
             )}
 
             <div className="purchase-section">
               <div className="quantity-control">
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus size={18} /></button>
+                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}>
+                  <Minus size={18} />
+                </button>
                 <span>{quantity}</span>
-                <button onClick={() => setQuantity(quantity + 1)}><Plus size={18} /></button>
+                <button 
+                  onClick={() => setQuantity(prev => {
+                    const max = selectedWeight ? selectedWeight.stock : product.stock;
+                    return prev < max ? prev + 1 : prev;
+                  })}
+                  disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
+                >
+                  <Plus size={18} />
+                </button>
               </div>
               <button
-                className="add-to-cart-btn"
+                className={`add-to-cart-btn ${(selectedWeight ? selectedWeight.stock : product.stock) <= 0 ? 'out-of-stock' : ''}`}
                 onClick={() => addToCart(product, quantity, selectedWeight)}
+                disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
               >
-                <ShoppingCart size={20} /> Add to Cart
+                <ShoppingCart size={20} /> 
+                {(selectedWeight ? selectedWeight.stock : product.stock) > 0 ? 'Add to Cart' : 'Out of Stock'}
               </button>
             </div>
 
