@@ -339,6 +339,7 @@ async function createProduct(payload) {
     }
 
     const slug = await ensureUniqueSlug(payload.name);
+    const totalVariantStock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
     const [product] = await trx("products")
       .insert({
         category_id: payload.category_id,
@@ -346,7 +347,7 @@ async function createProduct(payload) {
         slug,
         description: payload.description || null,
         base_price: payload.base_price,
-        stock: payload.stock ?? 0,
+        stock: payload.weight_variants?.length > 0 ? totalVariantStock : (payload.stock ?? 0),
         images: payload.images || [],
         is_featured: payload.is_featured ?? false,
         is_active: payload.is_active ?? true
@@ -405,6 +406,10 @@ async function updateProduct(id, payload) {
     }
     if (Object.prototype.hasOwnProperty.call(payload, "is_active")) {
       updates.is_active = payload.is_active;
+    }
+
+    if (payload.weight_variants?.length > 0) {
+      updates.stock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
     }
 
     await trx("products").where({ id }).update(updates);

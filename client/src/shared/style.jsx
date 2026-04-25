@@ -1141,13 +1141,40 @@ export const checkoutStyles = `
     line-height: 1.6;
   }
 
+  .promo-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .promo-section .promo-input-group {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .badge-secure {
+    background: #dcfce7;
+    color: #16a34a;
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 99px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
   .checkout-summary {
-    background: white;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(15px);
     padding: 3rem;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    height: fit-content;
     position: sticky;
-    top: 100px;
+    top: 120px;
   }
 
   .checkout-summary h3 {
@@ -1714,11 +1741,12 @@ export const cartStyles = `
   }
 
   .order-summary {
-    background: white;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
     padding: 3rem;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.5);
     position: sticky;
     top: 120px;
   }
@@ -1797,8 +1825,31 @@ export const cartStyles = `
   }
 
   @media (max-width: 1024px) {
-    .cart-grid {
+    .cart-layout {
       grid-template-columns: 1fr;
+      gap: 3rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .cart-page {
+      padding: 3rem 0;
+    }
+    .cart-header {
+      display: none;
+    }
+    .cart-item {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      text-align: center;
+      padding: 2rem 0;
+    }
+    .item-info {
+      flex-direction: column;
+      text-align: center;
+    }
+    .quantity-control {
+      margin: 0 auto;
     }
   }
 `;

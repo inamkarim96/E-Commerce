@@ -13,7 +13,7 @@ const CartPage = () => {
   const [promoMsg, setPromoMsg] = useState(null);
   const [promoLoading, setPromoLoading] = useState(false);
 
-  const shipping = subtotal > 5000 ? 0 : 500;
+  const shipping = subtotal >= 2000 ? 0 : 150;
   const total = subtotal - discount + shipping;
 
   const handleApplyPromo = async () => {
@@ -24,7 +24,7 @@ const CartPage = () => {
       const res = await validateCoupon(promoCode.trim(), subtotal);
       if (res.success && res.data) {
         setDiscount(res.data.discount_amount || 0);
-        setPromoMsg({ type: 'success', text: `Coupon applied! You saved $${res.data.discount_amount.toFixed(2)}` });
+        setPromoMsg({ type: 'success', text: `Coupon applied! You saved PKR ${res.data.discount_amount.toLocaleString()}` });
       } else {
         setPromoMsg({ type: 'error', text: 'Invalid coupon code.' });
       }
@@ -131,7 +131,7 @@ const CartPage = () => {
                 <span>{shipping === 0 ? 'FREE' : `PKR ${shipping.toLocaleString()}`}</span>
               </div>
               {shipping > 0 && (
-                <p className="shipping-note">Free shipping on orders over PKR 5,000!</p>
+                <p className="shipping-note">Free shipping on orders over PKR 2,000!</p>
               )}
 
               {discount > 0 && (

@@ -11,6 +11,16 @@ export const updateOrderStatus = async (orderId, data) => {
   return response.data;
 };
 
+export const getOrderDetails = async (orderId) => {
+  const response = await api.get(`/admin/orders/${orderId}`);
+  return response.data;
+};
+
+export const updateOrderNotes = async (orderId, notes) => {
+  const response = await api.patch(`/admin/orders/${orderId}/notes`, { notes });
+  return response.data;
+};
+
 //  Admin: Analytics 
 export const getAnalytics = async () => {
   const response = await api.get('/admin/analytics/overview');

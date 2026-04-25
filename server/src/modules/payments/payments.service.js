@@ -100,7 +100,7 @@ async function handleJazzcashWebhook(data) {
 
   const billRef = data.pp_BillReference; // e.g., "order_123"
   const orderIdStr = billRef ? billRef.replace("order_", "") : "";
-  const orderId = Number(orderIdStr);
+  const orderId = orderIdStr;
 
   if (!orderId) {
     throw new ApiError(400, "Invalid order reference", "INVALID_DATA");

@@ -73,9 +73,16 @@ async function fetchOrderById(orderId, trx = db) {
   }
 
   const items = await fetchOrderItems(order.id, trx);
+  const history = await trx("order_history as oh")
+    .leftJoin("users as u", "oh.changed_by", "u.id")
+    .where("oh.order_id", orderId)
+    .select("oh.*", "u.name as changed_by_name")
+    .orderBy("oh.created_at", "desc");
+
   return {
     ...order,
-    items
+    items,
+    history
   };
 }
 
@@ -87,9 +94,13 @@ async function listOwnOrders(userId, { page, limit }) {
   const totalRow = await db("orders").where({ user_id: userId }).count({ count: "*" }).first();
   const total = Number(totalRow?.count || 0);
 
-  const rows = await db("orders")
-    .where({ user_id: userId })
-    .orderBy("created_at", "desc")
+  const rows = await db("orders as o")
+    .where({ "o.user_id": userId })
+    .select(
+      "o.*",
+      db.raw("(SELECT SUM(quantity) FROM order_items WHERE order_id = o.id) as items_count")
+    )
+    .orderBy("o.created_at", "desc")
     .limit(limitNum)
     .offset(offset);
 
@@ -250,6 +261,10 @@ async function createOrderFromCart(userId, payload) {
       await trx("weight_variants")
         .where({ id: item.variant_id })
         .decrement("stock", item.quantity);
+      
+      await trx("products")
+        .where({ id: item.product_id })
+        .decrement("stock", item.quantity);
     }
 
     if (coupon) {
@@ -305,10 +320,14 @@ async function cancelOwnOrder(userId, orderId) {
       .where({ id: orderId })
       .update({ status: "cancelled", updated_at: trx.fn.now() });
 
-    const items = await trx("order_items").where({ order_id: orderId }).select("variant_id", "quantity");
+    const items = await trx("order_items").where({ order_id: orderId }).select("product_id", "variant_id", "quantity");
     for (const item of items) {
       await trx("weight_variants")
         .where({ id: item.variant_id })
+        .increment("stock", item.quantity);
+      
+      await trx("products")
+        .where({ id: item.product_id })
         .increment("stock", item.quantity);
     }
 
@@ -334,13 +353,25 @@ async function listAdminOrders(filters) {
   if (filters.user_id) query.where("o.user_id", filters.user_id);
   if (filters.date_from) query.where("o.created_at", ">=", new Date(filters.date_from));
   if (filters.date_to) query.where("o.created_at", "<=", new Date(filters.date_to));
+  
+  if (filters.search) {
+    query.where(function() {
+      this.where("u.name", "ilike", `%${filters.search}%`)
+          .orWhere("u.email", "ilike", `%${filters.search}%`);
+    });
+  }
 
   const totalRow = await query.clone().count({ count: "o.id" }).first();
   const total = Number(totalRow?.count || 0);
 
   const orders = await query
     .clone()
-    .select("o.*", "u.name as user_name", "u.email as user_email")
+    .select(
+      "o.*", 
+      "u.name as user_name", 
+      "u.email as user_email",
+      db.raw("(SELECT SUM(quantity) FROM order_items WHERE order_id = o.id) as items_count")
+    )
     .orderBy("o.created_at", "desc")
     .limit(limit)
     .offset(offset);
@@ -356,7 +387,7 @@ async function listAdminOrders(filters) {
   };
 }
 
-async function updateOrderStatusByAdmin(orderId, payload) {
+async function updateOrderStatusByAdmin(orderId, payload, adminId) {
   return db.transaction(async (trx) => {
     const order = await trx("orders").where({ id: orderId }).first();
     if (!order) {
@@ -389,6 +420,20 @@ async function updateOrderStatusByAdmin(orderId, payload) {
     }
 
     await trx("orders").where({ id: orderId }).update(updates);
+
+    if (payload.status === "cancelled" && order.status !== "cancelled") {
+      const items = await trx("order_items").where({ order_id: orderId }).select("product_id", "variant_id", "quantity");
+      for (const item of items) {
+        await trx("weight_variants")
+          .where({ id: item.variant_id })
+          .increment("stock", item.quantity);
+
+        await trx("products")
+          .where({ id: item.product_id })
+          .increment("stock", item.quantity);
+      }
+    }
+
     const updated = await fetchOrderById(orderId, trx);
 
     sendOrderEmailAsync({
@@ -402,11 +447,22 @@ async function updateOrderStatusByAdmin(orderId, payload) {
   });
 }
 
+async function getAdminOrder(orderId) {
+  return fetchOrderById(orderId);
+}
+
+async function updateOrderAdminNotes(orderId, notes) {
+  await db("orders").where({ id: orderId }).update({ admin_notes: notes, updated_at: db.fn.now() });
+  return fetchOrderById(orderId);
+}
+
 module.exports = {
   listOwnOrders,
   getOwnOrder,
   createOrderFromCart,
   cancelOwnOrder,
   listAdminOrders,
-  updateOrderStatusByAdmin
+  getAdminOrder,
+  updateOrderStatusByAdmin,
+  updateOrderAdminNotes
 };

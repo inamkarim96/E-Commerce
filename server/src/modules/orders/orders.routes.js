@@ -12,11 +12,18 @@ router.post("/orders", auth, asyncHandler(controller.createOrder));
 router.post("/orders/:id/cancel", auth, asyncHandler(controller.cancelOwnOrder));
 
 router.get("/admin/orders", auth, role("admin"), asyncHandler(controller.listAdminOrders));
+router.get("/admin/orders/:id", auth, role("admin"), asyncHandler(controller.getAdminOrder));
 router.patch(
   "/admin/orders/:id",
   auth,
   role("admin"),
   asyncHandler(controller.updateOrderStatusByAdmin)
+);
+router.patch(
+  "/admin/orders/:id/notes",
+  auth,
+  role("admin"),
+  asyncHandler(controller.updateOrderAdminNotes)
 );
 
 module.exports = router;

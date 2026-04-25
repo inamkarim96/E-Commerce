@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, Package, MapPin, Key, LogOut, ExternalLink, Grid, Box, ShoppingBag, Users } from 'lucide-react';
+import { User, Package, MapPin, Key, LogOut, ExternalLink, Grid, Box, ShoppingBag, Users, X } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { accountStyles } from '../shared/style';
-import { getMyOrders } from '../api/orders';
+import { getMyOrders, getOrderById } from '../api/orders';
 
 const AccountPage = () => {
   const { user, logout, updateProfile } = useAuth();
@@ -16,6 +16,8 @@ const AccountPage = () => {
   const [profileForm, setProfileForm] = useState({ name: user?.name || '', phone: user?.phone || '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   if (!user) return <Navigate to="/login" />;
 
@@ -26,7 +28,7 @@ const AccountPage = () => {
       try {
         setOrdersLoading(true);
         const res = await getMyOrders();
-        if (res.success) setOrders(res.data);
+        if (res.success) setOrders(res.data.orders || []);
       } catch (err) {
         console.error('Failed to load orders:', err);
       } finally {
@@ -46,6 +48,20 @@ const AccountPage = () => {
       setProfileMsg({ type: 'error', text: 'Failed to update profile.' });
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const handleViewOrder = async (orderId) => {
+    try {
+      setDetailsLoading(true);
+      const res = await getOrderById(orderId);
+      if (res.success) {
+        setSelectedOrderDetails(res.data.order);
+      }
+    } catch (err) {
+      console.error('Failed to load order details:', err);
+    } finally {
+      setDetailsLoading(false);
     }
   };
 
@@ -177,7 +193,7 @@ const AccountPage = () => {
                       <div key={order.id} className="order-card">
                         <div className="order-header">
                           <div className="order-meta">
-                            <span className="order-id">Order #{order.id}</span>
+                            <span className="order-id">Order #{order.id.substring(0, 8)}</span>
                             <span className="order-date">
                               {new Date(order.created_at || order.date).toLocaleDateString()}
                             </span>
@@ -189,13 +205,13 @@ const AccountPage = () => {
                         <div className="order-details">
                           <div className="detail-item">
                             <span>Total Amount</span>
-                            <strong>${Number(order.total_amount || order.total).toFixed(2)}</strong>
+                            <strong>PKR {Number(order.total).toLocaleString()}</strong>
                           </div>
                           <div className="detail-item">
                             <span>Items</span>
-                            <strong>{order.items?.length || order.items} Products</strong>
+                            <strong>{order.items_count || 0} Products</strong>
                           </div>
-                          <button className="view-order-btn">
+                          <button className="view-order-btn" onClick={() => handleViewOrder(order.id)}>
                             View Details <ExternalLink size={16} />
                           </button>
                         </div>
@@ -253,6 +269,82 @@ const AccountPage = () => {
           </main>
         </div>
       </div>
+
+      {selectedOrderDetails && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div className="modal-content" style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <button 
+              onClick={() => setSelectedOrderDetails(null)} 
+              style={{ position: 'absolute', right: '1.5rem', top: '1.5rem', border: 'none', background: 'transparent', cursor: 'pointer', color: '#666' }}
+            >
+              <X size={24} />
+            </button>
+            
+            <h2 style={{ marginBottom: '1.5rem' }}>Order Details</h2>
+            
+            <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b' }}>Order ID:</span>
+                <span style={{ fontWeight: 600 }}>#{selectedOrderDetails.id.substring(0, 8)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ color: '#64748b' }}>Date:</span>
+                <span>{new Date(selectedOrderDetails.created_at).toLocaleDateString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748b' }}>Status:</span>
+                <span className={`status-badge ${selectedOrderDetails.status.toLowerCase()}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}>
+                  {selectedOrderDetails.status}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Items Ordered</h3>
+              {selectedOrderDetails.items?.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <div>
+                    <div style={{ fontWeight: 500 }}>{item.product_name}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{item.variant_label} x {item.quantity}</div>
+                  </div>
+                  <div style={{ fontWeight: 500 }}>PKR {Number(item.subtotal).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span>Subtotal:</span>
+                <span>PKR {Number(selectedOrderDetails.subtotal).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span>Shipping Fee:</span>
+                <span>PKR {Number(selectedOrderDetails.shipping_fee).toLocaleString()}</span>
+              </div>
+              {Number(selectedOrderDetails.discount) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#16a34a' }}>
+                  <span>Discount:</span>
+                  <span>- PKR {Number(selectedOrderDetails.discount).toLocaleString()}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.1rem', marginTop: '0.5rem', color: 'var(--primary)' }}>
+                <span>Total:</span>
+                <span>PKR {Number(selectedOrderDetails.total).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+              <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Shipping Address</h4>
+              <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
+                {typeof selectedOrderDetails.shipping_address === 'object' 
+                  ? `${selectedOrderDetails.shipping_address.address}, ${selectedOrderDetails.shipping_address.city}, ${selectedOrderDetails.shipping_address.zip_code}, ${selectedOrderDetails.shipping_address.country}`
+                  : selectedOrderDetails.shipping_address}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{accountStyles}</style>
     </div>
   );

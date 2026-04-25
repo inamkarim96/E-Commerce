@@ -113,17 +113,26 @@ const ProductDetailPage = () => {
 
             <div className="stock-status-container">
               {((selectedWeight ? selectedWeight.stock : product.stock) > 0) ? (
-                <span className="stock-pill in-stock">
-                  <ShieldCheck size={14} /> In Stock
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span className="stock-pill in-stock">
+                      <ShieldCheck size={14} /> In Stock
+                    </span>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                      {(selectedWeight ? selectedWeight.stock : product.stock)} items available for this variant
+                    </span>
+                  </div>
+                  {(selectedWeight ? selectedWeight.stock : product.stock) < 10 && (
+                    <p style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600, margin: 0 }}>
+                      ⚠️ Hurry! Only a few left in stock.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <span className="stock-pill out-of-stock">
                    Out of Stock
                 </span>
               )}
-              <span className="stock-count">
-                {(selectedWeight ? selectedWeight.stock : product.stock)} items available
-              </span>
             </div>
 
             {product.weight_variants && product.weight_variants.length > 0 ? (
@@ -186,7 +195,7 @@ const ProductDetailPage = () => {
             <div className="benefit-grid">
               <div className="benefit-item">
                 <Truck size={20} />
-                <span>Free Delivery on orders over $50</span>
+                <span>Free Delivery on orders over PKR 2,000</span>
               </div>
               <div className="benefit-item">
                 <ShieldCheck size={20} />

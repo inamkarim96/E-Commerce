@@ -10,9 +10,18 @@ const AdminOrders = () => {
   const [filters, setFilters] = useState({
     status: '',
     date_from: '',
-    date_to: ''
+    date_to: '',
+    search: ''
   });
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [notesLoading, setNotesLoading] = useState(false);
+
+  useEffect(() => {
+    if (selectedOrder) {
+      setAdminNotes(selectedOrder.admin_notes || '');
+    }
+  }, [selectedOrder]);
 
   const fetchOrders = async () => {
     try {
@@ -21,6 +30,7 @@ const AdminOrders = () => {
       if (filters.status) params.status = filters.status;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
+      if (filters.search) params.search = filters.search;
       const res = await adminApi.getAllOrders(params);
       if (res.success) {
         setOrders(res.data.orders || []);
@@ -60,6 +70,32 @@ const AdminOrders = () => {
     }
   };
 
+  const handleViewOrder = async (orderId) => {
+    try {
+      const res = await adminApi.getOrderDetails(orderId);
+      if (res.success) {
+        setSelectedOrder(res.data.order);
+      }
+    } catch (err) {
+      toast.error('Failed to load order details');
+    }
+  };
+
+  const handleUpdateNotes = async () => {
+    try {
+      setNotesLoading(true);
+      const res = await adminApi.updateOrderNotes(selectedOrder.id, adminNotes);
+      if (res.success) {
+        toast.success('Notes updated');
+        setSelectedOrder(res.data.order);
+      }
+    } catch (err) {
+      toast.error('Failed to update notes');
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
   return (
     <div className="admin-orders">
       <div className="page-header">
@@ -68,7 +104,17 @@ const AdminOrders = () => {
         </div>
       </div>
 
-      <div className="toolbar" style={{ display: 'flex', gap: '1rem', background: 'white', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div className="toolbar" style={{ display: 'flex', gap: '1rem', background: 'white', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1, minWidth: '200px' }}>
+          <Search size={18} color="#666" />
+          <input 
+            type="text" 
+            placeholder="Search by name or email..." 
+            value={filters.search} 
+            onChange={e => setFilters(p => ({...p, search: e.target.value}))} 
+            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', width: '100%' }} 
+          />
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Status:</label>
           <select value={filters.status} onChange={e => setFilters(p => ({...p, status: e.target.value}))} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}>
@@ -117,7 +163,7 @@ const AdminOrders = () => {
                   <td>#{o.id.substring(0, 8)}</td>
                   <td>{o.user_name}</td>
                   <td>{new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                  <td>{o.items?.length || 0}</td>
+                  <td>{o.items_count || 0}</td>
                   <td>PKR {Number(o.total).toLocaleString()}</td>
                   <td>
                     <span className={`status-pill ${o.status}`} style={{ textTransform: 'capitalize' }}>
@@ -126,7 +172,7 @@ const AdminOrders = () => {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <button onClick={() => setSelectedOrder(o)} title="View" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
+                      <button onClick={() => handleViewOrder(o.id)} title="View" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
                         <Eye size={18} />
                       </button>
                       <select 
@@ -158,7 +204,9 @@ const AdminOrders = () => {
             </div>
             <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
               <p><strong>Customer:</strong> {selectedOrder.user_name} ({selectedOrder.user_email})</p>
-              <p><strong>Address:</strong> {selectedOrder.shipping_address}</p>
+              <p><strong>Address:</strong> {typeof selectedOrder.shipping_address === 'object' 
+                ? `${selectedOrder.shipping_address.address}, ${selectedOrder.shipping_address.city}, ${selectedOrder.shipping_address.zip_code}, ${selectedOrder.shipping_address.country}`
+                : selectedOrder.shipping_address}</p>
               <p><strong>Status:</strong> {selectedOrder.status}</p>
             </div>
             <h3>Items</h3>
@@ -176,6 +224,51 @@ const AdminOrders = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Discount:</span><span>- PKR {Number(selectedOrder.discount).toLocaleString()}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ccc' }}><span>Total:</span><span>PKR {Number(selectedOrder.total).toLocaleString()}</span></div>
             </div>
+
+            <div style={{ marginTop: '1.5rem' }}>
+              <h3>Admin Notes</h3>
+              <textarea 
+                value={adminNotes} 
+                onChange={(e) => setAdminNotes(e.target.value)}
+                placeholder="Add internal notes about this order..."
+                style={{ width: '100%', height: '80px', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', marginTop: '0.5rem', fontFamily: 'inherit' }}
+              />
+              <button 
+                onClick={handleUpdateNotes} 
+                disabled={notesLoading}
+                style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                {notesLoading ? 'Saving...' : 'Save Notes'}
+              </button>
+            </div>
+
+            {selectedOrder.history && selectedOrder.history.length > 0 && (
+              <div style={{ marginTop: '1.5rem' }}>
+                <h3>Order History</h3>
+                <div style={{ marginTop: '0.5rem', border: '1px solid #eee', borderRadius: '4px', background: '#fafafa' }}>
+                  {selectedOrder.history.map((log) => (
+                    <div key={log.id} style={{ padding: '0.75rem', borderBottom: '1px solid #eee', fontSize: '0.85rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                        <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
+                          {log.status_from ? `${log.status_from} → ` : ''}{log.status_to}
+                        </span>
+                        <span style={{ color: '#666' }}>
+                          {new Date(log.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <div style={{ color: '#444' }}>
+                        Changed by: {log.changed_by_name || 'System'}
+                      </div>
+                      {log.notes && (
+                        <div style={{ marginTop: '0.25rem', fontStyle: 'italic', color: '#666' }}>
+                          Note: {log.notes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -47,7 +47,17 @@ async function listAdminOrders(req, res) {
 
 async function updateOrderStatusByAdmin(req, res) {
   const payload = assertValid(adminUpdateStatusSchema, req.body);
-  const order = await ordersService.updateOrderStatusByAdmin(req.params.id, payload);
+  const order = await ordersService.updateOrderStatusByAdmin(req.params.id, payload, req.user.sub);
+  return sendSuccess(res, { order });
+}
+
+async function updateOrderAdminNotes(req, res) {
+  const order = await ordersService.updateOrderAdminNotes(req.params.id, req.body.notes);
+  return sendSuccess(res, { order });
+}
+
+async function getAdminOrder(req, res) {
+  const order = await ordersService.getAdminOrder(req.params.id);
   return sendSuccess(res, { order });
 }
 
@@ -57,5 +67,7 @@ module.exports = {
   createOrder,
   cancelOwnOrder,
   listAdminOrders,
-  updateOrderStatusByAdmin
+  getAdminOrder,
+  updateOrderStatusByAdmin,
+  updateOrderAdminNotes
 };

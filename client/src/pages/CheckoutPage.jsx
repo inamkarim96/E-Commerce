@@ -15,8 +15,13 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const shipping = subtotal > 50 ? 0 : 5.99;
-  const total = subtotal + shipping;
+  const [promoCode, setPromoCode] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [promoMsg, setPromoMsg] = useState(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+
+  const shipping = subtotal >= 2000 ? 0 : 150;
+  const total = subtotal + shipping - discount;
 
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -32,6 +37,26 @@ const CheckoutPage = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    try {
+      setPromoLoading(true);
+      setPromoMsg(null);
+      const { validateCoupon } = await import('../api/coupons');
+      const res = await validateCoupon(promoCode.trim(), subtotal);
+      if (res.success && res.data) {
+        setDiscount(res.data.discount_amount || 0);
+        setPromoMsg({ type: 'success', text: `Coupon applied! Saved PKR ${res.data.discount_amount.toLocaleString()}` });
+      } else {
+        setPromoMsg({ type: 'error', text: 'Invalid coupon code.' });
+      }
+    } catch (err) {
+      setPromoMsg({ type: 'error', text: err.response?.data?.error?.message || 'Invalid coupon code.' });
+    } finally {
+      setPromoLoading(false);
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -57,6 +82,7 @@ const CheckoutPage = () => {
           country: formData.country,
         },
         payment_method: gateway,
+        coupon_code: discount > 0 ? promoCode : null,
         subtotal,
         shipping_fee: shipping,
         total_amount: total,
@@ -288,7 +314,12 @@ const CheckoutPage = () => {
                         />
                         <span className="jazz-logo">JC</span>
                         <div className="payment-info">
-                          <span>JazzCash / Easypaisa</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span>JazzCash / Easypaisa</span>
+                            <span className="badge-secure">
+                              <ShieldCheck size={10} /> SECURE
+                            </span>
+                          </div>
                           <p>Local mobile wallet payment</p>
                         </div>
                       </label>
@@ -375,7 +406,7 @@ const CheckoutPage = () => {
                       >
                         {loading
                           ? 'Processing...'
-                          : `Place Order $${total.toFixed(2)}`}
+                          : `Place Order PKR ${Math.round(total).toLocaleString()}`}
                       </button>
                     </div>
                   </motion.div>
@@ -410,7 +441,7 @@ const CheckoutPage = () => {
                     </span>
                   </div>
                   <span className="sum-price">
-                    ${(item.price * item.quantity).toFixed(2)}
+                    PKR {(item.price * item.quantity).toLocaleString()}
                   </span>
                 </div>
               ))}
@@ -419,18 +450,50 @@ const CheckoutPage = () => {
             <div className="summary-costs">
               <div className="cost-row">
                 <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>PKR {subtotal.toLocaleString()}</span>
               </div>
+              {discount > 0 && (
+                <div className="cost-row discount">
+                  <span>Discount</span>
+                  <span style={{ color: '#059669' }}>-PKR {discount.toLocaleString()}</span>
+                </div>
+              )}
               <div className="cost-row">
                 <span>Shipping</span>
                 <span>
-                  {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
+                  {shipping === 0 ? 'FREE' : `PKR ${shipping.toLocaleString()}`}
                 </span>
               </div>
               <div className="cost-total">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>PKR {Math.round(total).toLocaleString()}</span>
               </div>
+            </div>
+
+            <div className="promo-section">
+               <div className="promo-input-group">
+                  <input
+                    type="text"
+                    placeholder="Promo Code"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                  />
+                  <button 
+                    onClick={handleApplyPromo} 
+                    disabled={promoLoading}
+                  >
+                    {promoLoading ? '...' : 'Apply'}
+                  </button>
+               </div>
+               {promoMsg && (
+                 <p style={{ 
+                    fontSize: '0.8rem', 
+                    marginTop: '0.5rem', 
+                    color: promoMsg.type === 'success' ? '#059669' : '#dc2626' 
+                 }}>
+                   {promoMsg.text}
+                 </p>
+               )}
             </div>
 
             <div className="checkout-guarantee">

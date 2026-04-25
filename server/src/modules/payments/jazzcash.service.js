@@ -25,9 +25,16 @@ async function initiateJazzcashPayment(order) {
   };
 
   // Sort keys and generate hash
-  const sortedKeys = Object.keys(transactionData).filter(k => k !== "pp_SecureHash" && transactionData[k] !== "").sort();
+  const sortedKeys = Object.keys(transactionData)
+    .filter(k => k !== "pp_SecureHash" && transactionData[k] !== "" && transactionData[k] !== null && transactionData[k] !== undefined)
+    .sort();
+  
   const hashString = (JAZZCASH_INTEGRITY_SALT || "") + "&" + sortedKeys.map(k => transactionData[k]).join("&");
   
+  if (NODE_ENV !== "production") {
+    console.log("JazzCash Hash String:", hashString);
+  }
+
   transactionData.pp_SecureHash = crypto.createHmac("sha256", JAZZCASH_INTEGRITY_SALT || "")
     .update(hashString)
     .digest("hex")
@@ -48,7 +55,7 @@ function verifyHash(data) {
   if (!secureHash) return false;
 
   const sortedKeys = Object.keys(data)
-    .filter(k => k !== "pp_SecureHash" && data[k] !== "" && data[k] !== null)
+    .filter(k => k !== "pp_SecureHash" && data[k] !== "" && data[k] !== null && data[k] !== undefined)
     .sort();
   
   const hashString = (JAZZCASH_INTEGRITY_SALT || "") + "&" + sortedKeys.map(k => data[k]).join("&");
@@ -57,6 +64,15 @@ function verifyHash(data) {
     .update(hashString)
     .digest("hex")
     .toUpperCase();
+
+  if (computedHash !== secureHash) {
+    console.warn("JazzCash Signature Mismatch!");
+    console.warn("Expected:", secureHash);
+    console.warn("Computed:", computedHash);
+    if (NODE_ENV !== "production") {
+      console.warn("Hash String used:", hashString);
+    }
+  }
 
   return computedHash === secureHash;
 }

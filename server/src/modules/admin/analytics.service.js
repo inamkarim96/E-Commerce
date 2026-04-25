@@ -14,7 +14,7 @@ async function getOverview() {
     .count("id as count");
 
   const [pendingOrders] = await db("orders")
-    .where("status", "pending")
+    .whereIn("status", ["pending", "processing"])
     .count("id as count");
 
   const [lowStockProducts] = await db("weight_variants")
