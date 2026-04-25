@@ -13,14 +13,14 @@ const registerAndLogin = async (userData = {}) => {
 
   const userPayload = { ...defaultUser, ...userData };
 
-  await request(app).post("/api/v1/auth/register").send(userPayload);
+  await request(app).post("egister").send(userPayload);
 
   // Manually update role if needed because register service hardcodes it to 'customer'
   if (userData.role) {
     await db("users").where({ email: userPayload.email }).update({ role: userData.role });
   }
 
-  const loginRes = await request(app).post("/api/v1/auth/login").send({
+  const loginRes = await request(app).post("ogin").send({
     email: userPayload.email,
     password: userPayload.password,
   });

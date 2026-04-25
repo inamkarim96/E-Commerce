@@ -16,7 +16,7 @@ describe("Users Module", () => {
   describe("GET /users/me", () => {
     it("should return user profile", async () => {
       const res = await request(app)
-        .get("/api/v1/users/me")
+        .get("/users/me")
         .set("Authorization", `Bearer ${userToken}`);
 
       expect(res.statusCode).toBe(200);
@@ -27,7 +27,7 @@ describe("Users Module", () => {
   describe("PUT /users/me", () => {
     it("should update user profile", async () => {
       const res = await request(app)
-        .put("/api/v1/users/me")
+        .put("/users/me")
         .set("Authorization", `Bearer ${userToken}`)
         .send({ name: "Updated Name" });
 
@@ -39,7 +39,7 @@ describe("Users Module", () => {
   describe("Address Management", () => {
     it("should add a new address", async () => {
       const res = await request(app)
-        .post("/api/v1/users/me/addresses")
+        .post("/users/me/addresses")
         .set("Authorization", `Bearer ${userToken}`)
         .send({
           full_name: "Test Address",
@@ -69,7 +69,7 @@ describe("Users Module", () => {
       });
 
       const res = await request(app)
-        .get("/api/v1/users/me/addresses")
+        .get("/users/me/addresses")
         .set("Authorization", `Bearer ${userToken}`);
 
       expect(res.statusCode).toBe(200);

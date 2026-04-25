@@ -1,6 +1,8 @@
 const express = require("express");
 const { sendSuccess } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
 const authRoutes = require("../modules/auth/auth.routes");
 const categoriesRoutes = require("../modules/categories/categories.routes");
 const productsRoutes = require("../modules/products/products.routes");
@@ -31,5 +33,8 @@ router.use("/", usersRoutes);
 router.use("/reviews", reviewsRoutes);
 router.use("/coupons", couponsRoutes);
 router.use("/admin/analytics", analyticsRoutes);
+
+const productsController = require("../modules/products/products.controller");
+router.get("/admin/products", auth, role("admin"), asyncHandler(productsController.listAdminProducts));
 
 module.exports = router;

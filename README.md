@@ -1,106 +1,99 @@
-# NaturaDry Backend API
+# 🌿 NaturaDry E-Commerce Platform
 
-A robust, secure, and scalable e-commerce backend built for the **NaturaDry** ecosystem. This platform handles everything from product management and user authentication to multi-gateway payments and automated email notifications.
-
----
-
-## Key Features
-
--   **Secure Authentication**: Multi-role (User/Admin) authentication using JWT and Bcrypt.
--   **Payment Integration**: Support for both **Stripe** (International) and **JazzCash** (Local) payment gateways.
--   **Product Management**: Full CRUD for products, categories, and reviews.
--   **Database Management**: PostgreSQL with **Knex.js** for migrations and seeding.
--   **Media Handling**: Automated image uploads and optimizations via **Cloudinary**.
--   **Communication**: Transactional emails powered by **SendGrid**.
--   **Security First**: 
-    -   Rate limiting and slow-down protection.
-    -   HTTP headers security with **Helmet**.
-    -   Input validation with **Joi**.
--   **Performance**: Redis-ready for caching and advanced rate limiting.
--   **Testing Suite**: Comprehensive integration testing with **Jest** and **Supertest**.
+A premium, full-stack e-commerce solution for natural dried products. This platform features a high-performance backend and a modern, responsive frontend designed with a focus on user experience and visual excellence.
 
 ---
 
-## Tech Stack
+## ✨ Key Features
 
--   **Runtime**: Node.js (v18+)
--   **Framework**: Express.js
--   **Database**: PostgreSQL
--   **ORM/Query Builder**: Knex.js
--   **Authentication**: JSON Web Tokens (JWT)
--   **Caching**: Redis (ioredis)
--   **Testing**: Jest & Supertest
--   **Integrations**: Stripe, JazzCash, Cloudinary, SendGrid
+### 🛒 Frontend (React)
+-   **Dynamic Product Discovery**: Search, filter by category, and toggle views (Grid/List).
+-   **Hook-Based State Management**: Optimized data fetching using custom `useProducts` hook.
+-   **Premium UI/UX**: Built with **Framer Motion** for smooth animations and **Tailwind-inspired** sleek styling.
+-   **Advanced Admin Dashboard**: Real-time product management, stock tracking, and analytics.
+-   **New! Image Upload During Creation**: Upload multiple product images simultaneously while adding new products.
+
+### ⚙️ Backend (Node.js/Express)
+-   **Secure Authentication**: Multi-role (User/Admin) protection using JWT and Bcrypt.
+-   **Flexible Payments**: Integrated with **Stripe** and **JazzCash** for international and local transactions.
+-   **Media Optimization**: Automated image handling via **Cloudinary**.
+-   **Communication**: Transactional emails powered by **Resend**.
+-   **Robust Security**: Rate limiting, Helmet security headers, and Joi input validation.
+-   **Database**: PostgreSQL with **Knex.js** for reliable migrations and seeding.
 
 ---
 
-## Getting Started
+## 🛠️ Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React, Vite, Framer Motion, Lucide Icons, Axios, React Hot Toast |
+| **Backend** | Node.js, Express.js, Knex.js |
+| **Database** | PostgreSQL, Redis (Caching) |
+| **Integrations** | Cloudinary (Media), Stripe & JazzCash (Payments), Resend (Email) |
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
--   Node.js (>= 18.x)
--   PostgreSQL
--   Redis (optional, for rate limiting)
+-   **Node.js** (>= 18.x)
+-   **PostgreSQL** (Running instance)
+-   **Cloudinary** account (For image storage)
 
 ### Installation
 
-1.  **Clone the repository**:
+1.  **Clone the Repository**:
     ```bash
-    git clone https://github.com/YOUR_USERNAME/NaturaDry.git
-    cd NaturaDry/server
+    git clone https://github.com/inamkarim96/NaturaDry.git
+    cd NaturaDry
     ```
 
-2.  **Install dependencies**:
+2.  **Setup the Backend**:
     ```bash
+    cd server
     npm install
-    ```
-
-3.  **Environment Setup**:
-    Create a `.env` file in the `server/` directory and populate it with your credentials:
-    ```env
-    PORT=5000
-    DATABASE_URL=postgres://user:password@localhost:5432/naturadry
-    JWT_SECRET=your_secret_key
-    CLOUDINARY_URL=your_cloudinary_url
-    STRIPE_SECRET_KEY=your_stripe_key
-    SENDGRID_API_KEY=your_sendgrid_key
-    ```
-
-4.  **Run Migrations**:
-    ```bash
+    # Create .env and add your DATABASE_URL, CLOUDINARY_URL, etc.
     npm run migrate
     npm run seed
+    npm run dev
     ```
 
-5.  **Start the server**:
+3.  **Setup the Frontend**:
     ```bash
+    cd ../client
+    npm install
+    # Create .env and add:
+    # VITE_API_URL=http://localhost:5000/api
     npm run dev
     ```
 
 ---
 
-## Running Tests
-
-```bash
-npm test
-```
-
----
-
-## Project Structure
+## 📂 Project Structure
 
 ```text
-server/
-├── src/
-│   ├── controllers/    # Request handlers
-│   ├── models/         # Database logic
-│   ├── routes/         # API endpoints
-│   ├── middlewares/    # Auth & Security
-│   └── server.js       # Entry point
-├── migrations/         # DB Schema versions
-├── seeds/              # Initial data
-├── tests/              # Integration tests
-└── knexfile.js         # DB configuration
+NaturaDry/
+├── client/              # React Frontend (Vite)
+│   ├── src/
+│   │   ├── api/         # Axios API services
+│   │   ├── hooks/       # Custom React Hooks (e.g., useProducts)
+│   │   ├── pages/       # Page components (Admin, Shop, etc.)
+│   │   └── shared/      # Global styles and constants
+├── server/              # Node.js Backend
+│   ├── src/
+│   │   ├── modules/     # Feature-based modules (Products, Auth, etc.)
+│   │   ├── config/      # DB & Cloud configurations
+│   │   └── utils/       # Shared helpers
+│   ├── migrations/      # DB Schema versions
+│   └── seeds/           # Initial demo data
+└── README.md            # You are here
 ```
 
 ---
 
+## 📝 Recent Updates
+
+-   ✅ **Refactored Data Layer**: Introduced `useProducts` custom hook to unify product fetching across Admin and Shop pages.
+-   ✅ **Enhanced Image Upload**: Enabled multi-image selection and uploading during initial product creation in the Admin panel.
+-   ✅ **Security Polish**: Standardized response formats and improved error handling across the API.

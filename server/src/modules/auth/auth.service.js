@@ -82,15 +82,17 @@ async function register(payload) {
     throw new ApiError(409, "Email already registered", "EMAIL_EXISTS");
   }
 
-  const passwordHash = await bcrypt.hash(payload.password, 12);
+  const password_hash = await bcrypt.hash(payload.password, 12);
+  const { name, email } = payload;
   const [user] = await db("users")
     .insert({
-      name: payload.name,
-      email: payload.email,
-      password_hash: passwordHash,
-      role: "customer",
-      phone: payload.phone || null,
-      email_verified: false
+      name,
+      email,
+      password_hash,
+      role: 'customer',   // always hardcoded — never from req.body
+      is_active: true,
+      email_verified: false,
+      failed_login_attempts: 0,
     })
     .returning("*");
 

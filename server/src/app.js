@@ -34,14 +34,14 @@ app.use(
 );
 
 app.use(cookieParser());
-app.use("/api/v1/auth", authLimiter);
-app.use("/api/v1", globalLimiter);
+app.use("/auth", authLimiter);
+app.use("/", globalLimiter);
 
 app.use("/payments/webhook/stripe", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(requestLogger);
 
-app.use("/api/v1", apiV1Router);
+app.use("/", apiV1Router);
 
 app.use((req, res) => {
   res.status(404).json({

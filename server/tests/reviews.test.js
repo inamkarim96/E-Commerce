@@ -24,7 +24,7 @@ describe("Reviews Module", () => {
   describe("POST /reviews", () => {
     it("should fail if user has not purchased product", async () => {
       const res = await request(app)
-        .post("/api/v1/reviews")
+        .post("s")
         .set("Authorization", `Bearer ${userToken}`)
         .send({
           product_id: productId,
@@ -58,7 +58,7 @@ describe("Reviews Module", () => {
       });
 
       const res = await request(app)
-        .post("/api/v1/reviews")
+        .post("s")
         .set("Authorization", `Bearer ${userToken}`)
         .send({
           product_id: productId,
@@ -73,7 +73,7 @@ describe("Reviews Module", () => {
 
   describe("GET /reviews/product/:productId", () => {
     it("should return reviews for a product", async () => {
-      const res = await request(app).get(`/api/v1/reviews/product/${productId}`);
+      const res = await request(app).get(`s/product/${productId}`);
       expect(res.statusCode).toBe(200);
       expect(Array.isArray(res.body.data.reviews)).toBe(true);
     });

@@ -29,14 +29,14 @@ describe("Products Module", () => {
 
   describe("GET /products", () => {
     it("should return paginated list", async () => {
-      const res = await request(app).get("/api/v1/products");
+      const res = await request(app).get("ts");
       expect(res.statusCode).toBe(200);
       expect(Array.isArray(res.body.data.products)).toBe(true);
       expect(res.body.data.pagination).toBeDefined();
     });
 
     it("should filter by category slug", async () => {
-      const res = await request(app).get("/api/v1/products?category=herbs");
+      const res = await request(app).get("ts?category=herbs");
       expect(res.statusCode).toBe(200);
       res.body.data.products.forEach(p => {
         expect(p.category.slug).toBe("herbs");
@@ -47,7 +47,7 @@ describe("Products Module", () => {
   describe("POST /products (admin)", () => {
     it("should create product with variants as admin", async () => {
       const res = await request(app)
-        .post("/api/v1/products")
+        .post("ts")
         .set("Authorization", `Bearer ${adminToken}`)
         .send({
           name: "New Product",
@@ -62,7 +62,7 @@ describe("Products Module", () => {
 
     it("should return 403 for customer token", async () => {
       const res = await request(app)
-        .post("/api/v1/products")
+        .post("ts")
         .set("Authorization", `Bearer ${customerToken}`)
         .send({ name: "Fail" });
 

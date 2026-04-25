@@ -51,10 +51,16 @@ async function deleteCategory(req, res) {
   return sendSuccess(res, { message: "Category deleted successfully" });
 }
 
+async function initializeCategories(req, res) {
+  const result = await categoriesService.initializeDefaults();
+  return sendSuccess(res, result);
+}
+
 module.exports = {
   listCategories,
   getCategoryById,
   createCategory,
   updateCategory,
-  deleteCategory
+  deleteCategory,
+  initializeCategories
 };

@@ -9,7 +9,7 @@ const schema = Joi.object({
     .default("development"),
   PORT: Joi.number().integer().min(1).max(65535).default(5000),
   DATABASE_URL: Joi.string().uri().required(),
-  REDIS_URL: Joi.string().uri().allow("").optional(),
+  REDIS_URL: Joi.string().uri({ scheme: ["redis", "rediss"] }).allow("").optional(),
   FRONTEND_URL: Joi.string().uri().required(),
   JWT_ACCESS_SECRET: Joi.string().min(16).required(),
   JWT_REFRESH_SECRET: Joi.string().min(16).required(),

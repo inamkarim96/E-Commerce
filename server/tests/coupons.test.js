@@ -18,7 +18,7 @@ describe("Coupons Module", () => {
   describe("POST /coupons/admin", () => {
     it("should create a new coupon", async () => {
       const res = await request(app)
-        .post("/api/v1/coupons/admin")
+        .post("s/admin")
         .set("Authorization", `Bearer ${adminToken}`)
         .send({
           code: "SAVE20",
@@ -45,7 +45,7 @@ describe("Coupons Module", () => {
       });
 
       const res = await request(app)
-        .post("/api/v1/coupons/validate")
+        .post("s/validate")
         .set("Authorization", `Bearer ${userToken}`)
         .send({ code: "VALID10", order_subtotal: 600 });
 
@@ -65,7 +65,7 @@ describe("Coupons Module", () => {
       });
 
       const res = await request(app)
-        .post("/api/v1/coupons/validate")
+        .post("s/validate")
         .set("Authorization", `Bearer ${userToken}`)
         .send({ code: "MIN1000", order_subtotal: 500 });
 

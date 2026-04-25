@@ -3,13 +3,10 @@ const Joi = require("joi");
 const passwordPattern = /^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
 
 const registerSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(100).required(),
-  email: Joi.string().trim().email().required(),
-  password: Joi.string().pattern(passwordPattern).required().messages({
-    "string.pattern.base":
-      "Password must be at least 8 characters and include one uppercase letter and one special character"
-  }),
-  phone: Joi.string().trim().max(20).allow("", null).optional()
+  name: Joi.string().min(2).max(100).required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).required(),
+  phone: Joi.string().optional()
 });
 
 const loginSchema = Joi.object({

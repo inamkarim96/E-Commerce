@@ -46,7 +46,7 @@ describe("Orders Module", () => {
   describe("POST /orders", () => {
     it("should create order from cart and clear cart", async () => {
       const res = await request(app)
-        .post("/api/v1/orders")
+        .post("/orders")
         .set("Authorization", `Bearer ${userToken}`)
         .send({
           payment_method: "cod",
@@ -66,7 +66,7 @@ describe("Orders Module", () => {
       await db("cart_items").where({ variant_id: variantId }).update({ quantity: 100 });
 
       const res = await request(app)
-        .post("/api/v1/orders")
+        .post("/orders")
         .set("Authorization", `Bearer ${userToken}`)
         .send({
           payment_method: "cod",
@@ -80,7 +80,7 @@ describe("Orders Module", () => {
   describe("POST /orders/:id/cancel", () => {
     it("should cancel pending order", async () => {
       const orderRes = await request(app)
-        .post("/api/v1/orders")
+        .post("/orders")
         .set("Authorization", `Bearer ${userToken}`)
         .send({
           payment_method: "cod",
@@ -90,7 +90,7 @@ describe("Orders Module", () => {
       const orderId = orderRes.body.data.order.id;
 
       const res = await request(app)
-        .post(`/api/v1/orders/${orderId}/cancel`)
+        .post(`/orders/${orderId}/cancel`)
         .set("Authorization", `Bearer ${userToken}`);
 
       expect(res.statusCode).toBe(200);

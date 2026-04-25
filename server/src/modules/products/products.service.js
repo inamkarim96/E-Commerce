@@ -173,6 +173,55 @@ async function listProducts(filters) {
   };
 }
 
+async function listAdminProducts(filters) {
+  const page = Number(filters.page || 1);
+  const limit = Number(filters.limit || 10);
+  const offset = (page - 1) * limit;
+
+  const baseQuery = db("products as p")
+    .join("categories as c", "p.category_id", "c.id")
+    .select(
+      "p.id",
+      "p.category_id",
+      "p.name",
+      "p.slug",
+      "p.description",
+      "p.base_price",
+      "p.stock",
+      "p.images",
+      "p.is_featured",
+      "p.is_active",
+      "p.created_at",
+      "p.updated_at",
+      "c.name as category_name",
+      "c.slug as category_slug",
+      "c.image as category_image"
+    );
+
+  const totalRow = await db("products as p").count({ count: "p.id" }).first();
+  const total = Number(totalRow?.count || 0);
+
+  baseQuery.orderBy("p.created_at", "desc");
+
+  const rows = await baseQuery.limit(limit).offset(offset);
+  const productIds = rows.map((row) => row.id);
+  const [variantsMap, reviewMap] = await Promise.all([
+    fetchVariantsByProductIds(productIds),
+    fetchReviewStatsByProductIds(productIds)
+  ]);
+
+  const products = rows.map((row) => mapProduct(row, variantsMap, reviewMap));
+  return {
+    products,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: total === 0 ? 0 : Math.ceil(total / limit)
+    }
+  };
+}
+
 async function getFeaturedProducts() {
   return listProducts({ page: 1, limit: 20, sort: "newest", featuredOnly: true }).then(
     (result) => result.products
@@ -420,6 +469,7 @@ async function appendProductImage(id, imageUrl) {
 
 module.exports = {
   listProducts,
+  listAdminProducts,
   getFeaturedProducts,
   searchProducts,
   getProductById,

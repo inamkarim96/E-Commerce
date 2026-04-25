@@ -31,18 +31,18 @@ describe("Admin Analytics Module", () => {
     const user = await db("users").first();
 
     await db("orders").insert([
-      { 
+      {
         user_id: user.id,
-        subtotal: 1000, 
-        total: 1000, 
-        status: "delivered", 
+        subtotal: 1000,
+        total: 1000,
+        status: "delivered",
         shipping_address: JSON.stringify({ name: "T1" })
       },
-      { 
+      {
         user_id: user.id,
-        subtotal: 500, 
-        total: 500, 
-        status: "pending", 
+        subtotal: 500,
+        total: 500,
+        status: "pending",
         shipping_address: JSON.stringify({ name: "T2" })
       }
     ]);
@@ -51,7 +51,7 @@ describe("Admin Analytics Module", () => {
   describe("GET /admin/analytics/overview", () => {
     it("should return business overview for admin", async () => {
       const res = await request(app)
-        .get("/api/v1/admin/analytics/overview")
+        .get("/admin/analytics/overview")
         .set("Authorization", `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
@@ -62,7 +62,7 @@ describe("Admin Analytics Module", () => {
     it("should deny access to regular users", async () => {
       const user = await registerAndLogin();
       const res = await request(app)
-        .get("/api/v1/admin/analytics/overview")
+        .get("/admin/analytics/overview")
         .set("Authorization", `Bearer ${user.accessToken}`);
 
       expect(res.statusCode).toBe(403);
@@ -72,7 +72,7 @@ describe("Admin Analytics Module", () => {
   describe("GET /admin/analytics/top-products", () => {
     it("should return top products", async () => {
       const res = await request(app)
-        .get("/api/v1/admin/analytics/top-products")
+        .get("/admin/analytics/top-products")
         .set("Authorization", `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);

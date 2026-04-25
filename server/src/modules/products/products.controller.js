@@ -26,6 +26,11 @@ async function listProducts(req, res) {
   return sendSuccess(res, data);
 }
 
+async function listAdminProducts(req, res) {
+  const data = await productsService.listAdminProducts(req.query);
+  return sendSuccess(res, data);
+}
+
 async function getFeaturedProducts(req, res) {
   const products = await productsService.getFeaturedProducts();
   return sendSuccess(res, { products });
@@ -84,6 +89,7 @@ async function uploadProductImageById(req, res) {
 
 module.exports = {
   listProducts,
+  listAdminProducts,
   getFeaturedProducts,
   searchProducts,
   getProductById,

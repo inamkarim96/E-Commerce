@@ -4,8 +4,8 @@ const { db } = require("../src/config/db");
 
 describe("Auth Module", () => {
   const testUser = {
-    name: "John Doe",
-    email: "john@example.com",
+    name: "your name  Doe",
+    email: "your name @example.com",
     password: "Password123!",
     phone: "+92-300-1112222",
   };
@@ -13,7 +13,7 @@ describe("Auth Module", () => {
   describe("POST /auth/register", () => {
     it("should return 201 with user object on valid data", async () => {
       const res = await request(app)
-        .post("/api/v1/auth/register")
+        .post("egister")
         .send(testUser);
 
       expect(res.statusCode).toBe(201);
@@ -23,9 +23,9 @@ describe("Auth Module", () => {
     });
 
     it("should return 409 if email already exists", async () => {
-      await request(app).post("/api/v1/auth/register").send(testUser);
+      await request(app).post("egister").send(testUser);
       const res = await request(app)
-        .post("/api/v1/auth/register")
+        .post("egister")
         .send(testUser);
 
       expect(res.statusCode).toBe(409);
@@ -33,7 +33,7 @@ describe("Auth Module", () => {
 
     it("should return 400 if password too weak", async () => {
       const res = await request(app)
-        .post("/api/v1/auth/register")
+        .post("egister")
         .send({ ...testUser, password: "123" });
 
       expect(res.statusCode).toBe(400);
@@ -41,7 +41,7 @@ describe("Auth Module", () => {
 
     it("should return 400 if email invalid", async () => {
       const res = await request(app)
-        .post("/api/v1/auth/register")
+        .post("egister")
         .send({ ...testUser, email: "invalid-email" });
 
       expect(res.statusCode).toBe(400);
@@ -50,12 +50,12 @@ describe("Auth Module", () => {
 
   describe("POST /auth/login", () => {
     beforeEach(async () => {
-      await request(app).post("/api/v1/auth/register").send(testUser);
+      await request(app).post("egister").send(testUser);
     });
 
     it("should return 200 with accessToken on valid credentials", async () => {
       const res = await request(app)
-        .post("/api/v1/auth/login")
+        .post("ogin")
         .send({ email: testUser.email, password: testUser.password });
 
       expect(res.statusCode).toBe(200);
@@ -65,7 +65,7 @@ describe("Auth Module", () => {
 
     it("should return 401 on wrong password", async () => {
       const res = await request(app)
-        .post("/api/v1/auth/login")
+        .post("ogin")
         .send({ email: testUser.email, password: "WrongPassword!" });
 
       expect(res.statusCode).toBe(401);
@@ -73,7 +73,7 @@ describe("Auth Module", () => {
 
     it("should return 401 on non-existent email", async () => {
       const res = await request(app)
-        .post("/api/v1/auth/login")
+        .post("ogin")
         .send({ email: "nobody@example.com", password: testUser.password });
 
       expect(res.statusCode).toBe(401);
