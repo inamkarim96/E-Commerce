@@ -4,15 +4,22 @@ const stripeService = require("./stripe.service");
 
 async function initiatePayment(req, res) {
   const { order_id, gateway } = req.body;
-  const result = await paymentsService.initiatePayment(req.user.id, { order_id, gateway });
+  const result = await paymentsService.initiatePayment(req.user.sub, { order_id, gateway });
   sendSuccess(res, result);
 }
 
 async function jazzcashWebhook(req, res) {
   await paymentsService.handleJazzcashWebhook(req.body);
-  
-  // Return 200 OK
   res.status(200).send("OK");
+}
+
+// Handles the browser redirect from the JazzCash portal after payment
+async function jazzcashCallback(req, res) {
+  // JazzCash POSTs (or GETs) form data to this URL after the user pays
+  const data = { ...req.query, ...req.body };
+  const result = await paymentsService.handleJazzcashCallback(data);
+  const { FRONTEND_URL } = require("../../config/env");
+  res.redirect(`${FRONTEND_URL}${result.redirect}`);
 }
 
 async function stripeWebhook(req, res) {
@@ -33,7 +40,7 @@ async function stripeWebhook(req, res) {
 
 async function getPaymentStatus(req, res) {
   const { orderId } = req.params;
-  const result = await paymentsService.getPaymentStatus(req.user.id, orderId);
+  const result = await paymentsService.getPaymentStatus(req.user.sub, orderId);
   sendSuccess(res, result);
 }
 
@@ -46,6 +53,7 @@ async function adminRefund(req, res) {
 module.exports = {
   initiatePayment,
   jazzcashWebhook,
+  jazzcashCallback,
   stripeWebhook,
   getPaymentStatus,
   adminRefund

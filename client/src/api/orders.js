@@ -15,7 +15,7 @@ export const getOrderById = async (id) => {
   return response.data;
 };
 
-export const initiatePayment = async (orderId, method) => {
-  const response = await api.post(`/payments/${orderId}/initiate`, { method });
+export const initiatePayment = async (orderId, gateway) => {
+  const response = await api.post('/payments/initiate', { order_id: orderId, gateway });
   return response.data;
 };

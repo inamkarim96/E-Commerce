@@ -26,7 +26,7 @@ const CheckoutPage = () => {
     city: '',
     country: 'Pakistan',
     zipCode: '',
-    paymentMethod: 'card',
+    paymentMethod: 'cod',
   });
 
   const handleInputChange = (e) => {
@@ -38,6 +38,10 @@ const CheckoutPage = () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Map frontend method name to backend gateway enum
+      const gatewayMap = { card: 'stripe', jazzcash: 'jazzcash', cod: 'cod' };
+      const gateway = gatewayMap[formData.paymentMethod] || 'cod';
 
       const orderData = {
         items: cart.map((item) => ({
@@ -52,29 +56,53 @@ const CheckoutPage = () => {
           zip_code: formData.zipCode,
           country: formData.country,
         },
-        payment_method: formData.paymentMethod,
+        payment_method: gateway,
         subtotal,
         shipping_fee: shipping,
         total_amount: total,
       };
 
-      const response = await ordersApi.createOrder(orderData);
+      // Step 1: Create the order
+      const orderResponse = await ordersApi.createOrder(orderData);
+      if (!orderResponse.success) throw new Error('Order creation failed');
 
-      if (response.success) {
-        clearCart();
-        navigate('/order-confirmation', {
-          state: {
-            orderId:
-              response.data.id ||
-              response.data.order_id ||
-              'ND-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-          },
+      const orderId = orderResponse.data?.order?.id || orderResponse.data?.orderId;
+
+      // Step 2: Initiate payment based on gateway
+      if (gateway === 'jazzcash') {
+        const payResponse = await ordersApi.initiatePayment(orderId, 'jazzcash');
+        const { postUrl, fields } = payResponse.data?.jazzcash_response || {};
+
+        if (!postUrl || !fields) throw new Error('JazzCash response missing. Check credentials.');
+
+        // Build and submit hidden form → redirects browser to JazzCash portal
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = postUrl;
+        Object.entries(fields).forEach(([key, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
         });
+        document.body.appendChild(form);
+        form.submit();
+        return; // Browser is redirecting — stop here
       }
+
+      // COD and Stripe → go to confirmation page
+      clearCart();
+      navigate('/order-confirmation', {
+        state: {
+          orderId: orderId || 'ND-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+        },
+      });
     } catch (err) {
-      console.error('Order creation failed:', err);
+      console.error('Order failed:', err);
       setError(
         err.response?.data?.error?.message ||
+        err.message ||
         'Failed to place order. Please try again.'
       );
     } finally {
@@ -82,8 +110,13 @@ const CheckoutPage = () => {
     }
   };
 
+  React.useEffect(() => {
+    if (cart.length === 0 && step === 1) {
+      navigate('/shop');
+    }
+  }, [cart.length, step, navigate]);
+
   if (cart.length === 0 && step === 1) {
-    navigate('/shop');
     return null;
   }
 
@@ -255,8 +288,25 @@ const CheckoutPage = () => {
                         />
                         <span className="jazz-logo">JC</span>
                         <div className="payment-info">
-                          <span>JazzCash</span>
+                          <span>JazzCash / Easypaisa</span>
                           <p>Local mobile wallet payment</p>
+                        </div>
+                      </label>
+                      <label
+                        className={`payment-card ${formData.paymentMethod === 'cod' ? 'selected' : ''
+                          }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="cod"
+                          checked={formData.paymentMethod === 'cod'}
+                          onChange={handleInputChange}
+                        />
+                        <CheckCircle size={24} />
+                        <div className="payment-info">
+                          <span>Cash on Delivery</span>
+                          <p>Pay when you receive the order</p>
                         </div>
                       </label>
                     </div>
@@ -265,7 +315,9 @@ const CheckoutPage = () => {
                       <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                         {formData.paymentMethod === 'card'
                           ? 'You will be redirected to Stripe to securely enter your card details.'
-                          : 'You will be redirected to the JazzCash portal to complete your payment.'}
+                          : formData.paymentMethod === 'jazzcash'
+                            ? 'You will be redirected to the JazzCash portal to complete your payment.'
+                            : 'Order now and pay with cash when your package is delivered.'}
                       </p>
                     </div>
 
@@ -305,7 +357,9 @@ const CheckoutPage = () => {
                         <p>
                           {formData.paymentMethod === 'card'
                             ? 'Credit Card (Stripe)'
-                            : 'JazzCash Wallet'}
+                            : formData.paymentMethod === 'jazzcash'
+                              ? 'JazzCash Wallet'
+                              : 'Cash on Delivery'}
                         </p>
                       </div>
                     </div>
@@ -349,7 +403,11 @@ const CheckoutPage = () => {
                   </div>
                   <div className="sum-info">
                     <h4>{item.name}</h4>
-                    <span>{item.selectedWeight}</span>
+                    <span>
+                      {typeof item.selectedWeight === 'object' 
+                        ? item.selectedWeight.label 
+                        : item.selectedWeight}
+                    </span>
                   </div>
                   <span className="sum-price">
                     ${(item.price * item.quantity).toFixed(2)}
@@ -384,7 +442,7 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      <style jsx>{checkoutStyles}</style>
+      <style>{checkoutStyles}</style>
     </div>
   );
 };

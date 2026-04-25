@@ -1,12 +1,16 @@
 import React from 'react';
-import { useLocation, Link, Navigate } from 'react-router-dom';
+import { useLocation, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, Package, Truck, ArrowRight, Mail } from 'lucide-react';
 import { confirmationStyles } from '../shared/style';
 
 const OrderConfirmationPage = () => {
   const location = useLocation();
-  const orderId = location.state?.orderId;
+  const [searchParams] = useSearchParams();
+
+  // Accepts order ID from: router state (COD/direct) OR query param (JazzCash redirect)
+  const orderId = location.state?.orderId || searchParams.get('order_id');
+  const viaJazzCash = searchParams.get('via') === 'jazzcash';
 
   if (!orderId) {
     return <Navigate to="/" />;
@@ -26,6 +30,16 @@ const OrderConfirmationPage = () => {
           </div>
           <h1>Thank You for Your Order!</h1>
           <p className="order-number">Order ID: <strong>{orderId}</strong></p>
+          {viaJazzCash && (
+            <p style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+              background: '#dcfce7', color: '#16a34a', borderRadius: '999px',
+              padding: '0.4rem 1.2rem', fontWeight: 600, fontSize: '0.95rem',
+              marginBottom: '1.5rem'
+            }}>
+              <CheckCircle size={16} /> JazzCash payment verified
+            </p>
+          )}
           <p className="sub-text">
             We've received your order and we're getting it ready for shipment. 
             A confirmation email has been sent to your inbox.
@@ -72,7 +86,7 @@ const OrderConfirmationPage = () => {
         </motion.div>
       </div>
 
-      <style jsx>{confirmationStyles}</style>
+      <style>{confirmationStyles}</style>
     </div>
   );
 };

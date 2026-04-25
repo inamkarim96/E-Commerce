@@ -6,7 +6,16 @@ const createOrderSchema = Joi.object({
     .valid("jazzcash", "easypaisa", "stripe", "cod")
     .required(),
   coupon_code: Joi.string().trim().max(50).allow("", null).optional(),
-  notes: Joi.string().trim().allow("", null).optional()
+  notes: Joi.string().trim().allow("", null).optional(),
+  items: Joi.array().items(
+    Joi.object({
+      product_id: Joi.string().uuid().required(),
+      quantity: Joi.number().integer().min(1).required(),
+      variant_id: Joi.string().uuid().optional(), // optional if we use weight label or similar
+      weight: Joi.any().optional(), // allow the object we send from frontend
+      price: Joi.number().optional()
+    })
+  ).optional()
 });
 
 const listOwnOrdersSchema = Joi.object({

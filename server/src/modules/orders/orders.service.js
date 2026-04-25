@@ -147,7 +147,7 @@ async function validateCoupon(couponCode, subtotal, trx) {
 
 async function createOrderFromCart(userId, payload) {
   const result = await db.transaction(async (trx) => {
-    const cartItems = await trx("cart_items as ci")
+    let cartItems = await trx("cart_items as ci")
       .join("products as p", "ci.product_id", "p.id")
       .join("weight_variants as w", "ci.variant_id", "w.id")
       .where("ci.user_id", userId)
@@ -162,6 +162,35 @@ async function createOrderFromCart(userId, payload) {
         "w.price as variant_price",
         "w.stock as variant_stock"
       );
+
+    // FALLBACK: If DB cart is empty, check if items were provided in payload
+    if (!cartItems.length && payload.items && payload.items.length) {
+      for (const item of payload.items) {
+        // Resolve variant_id from weight object if needed
+        const variantId = item.variant_id || (typeof item.weight === 'object' ? item.weight.id : null);
+        if (!variantId) throw new ApiError(400, "Missing variant_id for item", "INVALID_PAYLOAD");
+
+        const details = await trx("weight_variants as w")
+          .join("products as p", "w.product_id", "p.id")
+          .where("w.id", variantId)
+          .select("w.*", "p.name as product_name", "p.is_active")
+          .first();
+
+        if (!details || !details.is_active) {
+          throw new ApiError(404, `Product/Variant not found: ${item.product_id}`, "NOT_FOUND");
+        }
+
+        cartItems.push({
+          product_id: details.product_id,
+          variant_id: details.id,
+          quantity: item.quantity,
+          product_name: details.product_name,
+          variant_label: details.label,
+          variant_price: details.price,
+          variant_stock: details.stock
+        });
+      }
+    }
 
     if (!cartItems.length) {
       throw new ApiError(400, "Cart is empty", "EMPTY_CART");

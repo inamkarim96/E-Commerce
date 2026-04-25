@@ -18,6 +18,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminProducts from './pages/AdminProducts';
 import AdminOrders from './pages/AdminOrders';
 import AdminUsers from './pages/AdminUsers';
+import PaymentFailedPage from './pages/PaymentFailedPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -47,6 +48,7 @@ function App() {
         <Route path="/product/:slug" element={<MainLayout><ProductDetailPage /></MainLayout>} />
         <Route path="/cart" element={<MainLayout><CartPage /></MainLayout>} />
         <Route path="/login" element={<MainLayout><LoginPage /></MainLayout>} />
+        <Route path="/payment/failed" element={<MainLayout><PaymentFailedPage /></MainLayout>} />
 
         {/* Customer (PrivateRoute) */}
         <Route path="/checkout" element={<PrivateRoute><MainLayout><CheckoutPage /></MainLayout></PrivateRoute>} />

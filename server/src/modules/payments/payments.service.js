@@ -69,16 +69,12 @@ async function initiatePayment(userId, { order_id, gateway }) {
     }
 
     if (gateway === "cod") {
-      await trx("payments").where({ id: payment_id }).update({
-        status: "completed",
-        paid_at: trx.fn.now(),
-        updated_at: trx.fn.now()
-      });
+      // For COD, payment stays pending until actual delivery, but order is confirmed
       await trx("orders").where({ id: order.id }).update({
         status: "processing",
         updated_at: trx.fn.now()
       });
-      return { success: true };
+      return { success: true, message: "Order placed successfully with Cash on Delivery." };
     }
 
     if (gateway === "jazzcash" || gateway === "easypaisa") {
@@ -122,8 +118,8 @@ async function handleJazzcashWebhook(data) {
     }
 
     const payment = await trx("payments").where({ order_id: order.id }).first();
-    if (!payment) {
-      throw new ApiError(404, "Payment record not found", "PAYMENT_NOT_FOUND");
+    if (!payment || payment.status === "completed") {
+      return { success: true }; // Already processed
     }
 
     // Verify amount match
@@ -278,9 +274,76 @@ async function adminRefund(orderId) {
   });
 }
 
+// handleJazzcashCallback processes the POST redirect from the JazzCash portal
+// after the user completes (or abandons) the payment flow.
+async function handleJazzcashCallback(data) {
+  // Verify hash integrity
+  const isValid = jazzcashService.verifyHash(data);
+  if (!isValid) {
+    return { success: false, redirect: "/payment/failed?reason=invalid_signature" };
+  }
+
+  const billRef = data.pp_BillReference;
+  const orderIdStr = billRef ? billRef.replace("order_", "") : "";
+  const orderId = orderIdStr;
+
+  if (!orderId) {
+    return { success: false, redirect: "/payment/failed?reason=invalid_ref" };
+  }
+
+  const isSuccess = data.pp_ResponseCode === "000" || data.pp_ResponseCode === "121";
+
+  try {
+    await db.transaction(async (trx) => {
+      const order = await trx("orders as o")
+        .join("users as u", "o.user_id", "u.id")
+        .where("o.id", orderId)
+        .select("o.*", "u.email as user_email")
+        .first();
+
+      if (!order) return; // Silently skip if already processed
+
+      const payment = await trx("payments").where({ order_id: order.id }).first();
+      if (!payment || payment.status === "completed") return; // Idempotency guard
+
+      const status = isSuccess ? "completed" : "failed";
+
+      await trx("payments").where({ id: payment.id }).update({
+        status,
+        transaction_id: data.pp_TxnRefNo || null,
+        gateway_resp: JSON.stringify(data),
+        paid_at: isSuccess ? trx.fn.now() : null,
+        updated_at: trx.fn.now()
+      });
+
+      if (isSuccess && order.status === "pending") {
+        await trx("orders").where({ id: order.id }).update({
+          status: "processing",
+          updated_at: trx.fn.now()
+        });
+
+        sendEmailAsync({
+          to: order.user_email,
+          subject: `Payment Successful - Order #${order.id}`,
+          text: `Your payment for order #${order.id} was successful. We are now processing your order.`,
+          html: `<p>Your payment for order <strong>#${order.id}</strong> was successful.</p><p>We are now processing your order.</p>`
+        });
+      }
+    });
+  } catch (err) {
+    console.error("JazzCash callback processing error:", err.message);
+  }
+
+  if (isSuccess) {
+    return { redirect: `/order-confirmation?order_id=${orderId}&via=jazzcash` };
+  }
+  return { redirect: `/payment/failed?order_id=${orderId}&code=${data.pp_ResponseCode || "unknown"}` };
+}
+
 module.exports = {
   initiatePayment,
   handleJazzcashWebhook,
+  handleJazzcashCallback,
   handleStripeWebhook,
   getPaymentStatus,
   adminRefund

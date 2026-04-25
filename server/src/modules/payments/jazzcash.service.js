@@ -1,59 +1,64 @@
 const crypto = require("crypto");
-const JazzCash = require("@zfhassaan/jazzcash");
-const { JAZZCASH_MERCHANT_ID, JAZZCASH_PASSWORD, JAZZCASH_INTEGRITY_SALT, NODE_ENV, FRONTEND_URL } = require("../../config/env");
-
-let jazzcashClient;
-
-const getJazzcashClient = () => {
-  if (!jazzcashClient) {
-    jazzcashClient = new JazzCash({
-      merchantId: JAZZCASH_MERCHANT_ID || "",
-      password: JAZZCASH_PASSWORD || "",
-      integritySalt: JAZZCASH_INTEGRITY_SALT || "",
-      environment: NODE_ENV === "production" ? "production" : "sandbox"
-    });
-  }
-  return jazzcashClient;
-};
+const { JAZZCASH_MERCHANT_ID, JAZZCASH_PASSWORD, JAZZCASH_INTEGRITY_SALT, NODE_ENV, FRONTEND_URL, BACKEND_URL } = require("../../config/env");
 
 async function initiateJazzcashPayment(order) {
   const amountStr = Math.round(Number(order.total) * 100).toString(); // in paisa
+  const txnRefNo = "T" + Date.now(); // Generate a unique transaction reference
+  const txnDateTime = new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14);
+  const expiryDateTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().replace(/[-:T.Z]/g, "").slice(0, 14);
 
   const transactionData = {
-    amount: amountStr,
-    billReference: "order_" + order.id,
-    description: "Payment for order " + order.id,
-    returnUrl: `${FRONTEND_URL}/payment/callback/jazzcash`
+    pp_Version: "1.1",
+    pp_TxnType: "MWALLET",
+    pp_Language: "EN",
+    pp_MerchantID: JAZZCASH_MERCHANT_ID,
+    pp_Password: JAZZCASH_PASSWORD,
+    pp_TxnRefNo: txnRefNo,
+    pp_Amount: amountStr,
+    pp_TxnCurrency: "PKR",
+    pp_TxnDateTime: txnDateTime,
+    pp_BillReference: "order_" + order.id,
+    pp_Description: "Payment for order #" + order.id,
+    pp_TxnExpiryDateTime: expiryDateTime,
+    pp_ReturnURL: `${BACKEND_URL}/payments/callback/jazzcash`,
+    pp_SecureHash: ""
   };
 
-  const response = await getJazzcashClient().initiateTransaction(transactionData);
+  // Sort keys and generate hash
+  const sortedKeys = Object.keys(transactionData).filter(k => k !== "pp_SecureHash" && transactionData[k] !== "").sort();
+  const hashString = (JAZZCASH_INTEGRITY_SALT || "") + "&" + sortedKeys.map(k => transactionData[k]).join("&");
+  
+  transactionData.pp_SecureHash = crypto.createHmac("sha256", JAZZCASH_INTEGRITY_SALT || "")
+    .update(hashString)
+    .digest("hex")
+    .toUpperCase();
 
-  return response;
+  const postUrl = NODE_ENV === "production" 
+    ? "https://payments.jazzcash.com.pk/CustomerPortal/transaction/Checkout"
+    : "https://sandbox.jazzcash.com.pk/CustomerPortal/transaction/Checkout";
+
+  return {
+    postUrl,
+    fields: transactionData
+  };
 }
 
 function verifyHash(data) {
   const secureHash = data.pp_SecureHash;
   if (!secureHash) return false;
 
-  // Since the package's generateSecureHash method does not match standard Hosted Checkout webhook hash,
-  // we still use the standard HMAC validation for the webhook, or we can try using the package's generator.
-  // The package hashes like this: crypto.createHmac('sha256', this.integritySalt).update(hashString).digest('hex')
-  const sortedKeys = Object.keys(data).filter(k => k !== "pp_SecureHash" && data[k] !== "" && data[k] !== null).sort();
-  const hashString = sortedKeys.map(k => data[k]).join("&");
+  const sortedKeys = Object.keys(data)
+    .filter(k => k !== "pp_SecureHash" && data[k] !== "" && data[k] !== null)
+    .sort();
+  
+  const hashString = (JAZZCASH_INTEGRITY_SALT || "") + "&" + sortedKeys.map(k => data[k]).join("&");
 
   const computedHash = crypto.createHmac("sha256", JAZZCASH_INTEGRITY_SALT || "")
     .update(hashString)
     .digest("hex")
     .toUpperCase();
 
-  // We should also check the standard JazzCash way just in case:
-  const standardHashString = (JAZZCASH_INTEGRITY_SALT || "") + "&" + sortedKeys.map(k => data[k]).join("&");
-  const standardComputedHash = crypto.createHmac("sha256", JAZZCASH_INTEGRITY_SALT || "")
-    .update(standardHashString)
-    .digest("hex")
-    .toUpperCase();
-
-  return computedHash === secureHash || standardComputedHash === secureHash;
+  return computedHash === secureHash;
 }
 
 module.exports = {

@@ -2514,3 +2514,72 @@ export const confirmationStyles = `
     }
   }
 `;
+
+/* PaymentFailed Styles */
+export const paymentFailedStyles = `
+  .failed-page {
+    padding: 6rem 0 10rem;
+    background: var(--bg-main);
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+  }
+
+  .failed-card {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 4rem;
+    text-align: center;
+    max-width: 640px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .fail-icon {
+    color: #ef4444;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+
+  .failed-card h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-main);
+  }
+
+  .failed-card .sub-text {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    line-height: 1.7;
+    margin-bottom: 0.5rem;
+  }
+
+  .error-code {
+    display: inline-block;
+    background: #fee2e2;
+    color: #b91c1c;
+    border-radius: var(--radius-md);
+    padding: 0.3rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 1rem 0 2.5rem;
+    font-family: monospace;
+  }
+
+  .failed-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 640px) {
+    .failed-card {
+      padding: 3rem 1.5rem;
+    }
+    .failed-card h1 {
+      font-size: 1.8rem;
+    }
+  }
+`;
