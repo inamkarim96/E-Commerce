@@ -1,33 +1,32 @@
-const { db } = require("../../config/db");
+const prisma = require("../../config/prisma");
 
 async function getOverview() {
-  const [revenueAndOrders] = await db("orders")
-    .whereNot("status", "cancelled")
-    .select(
-      db.raw("SUM(total) as total_revenue"),
-      db.raw("COUNT(id) as total_orders"),
-      db.raw("AVG(total) as avg_order_value")
-    );
+  const revenueAndOrders = await prisma.orders.aggregate({
+    where: { NOT: { status: "cancelled" } },
+    _sum: { total: true },
+    _count: { id: true },
+    _avg: { total: true }
+  });
 
-  const [totalCustomers] = await db("users")
-    .where("role", "customer")
-    .count("id as count");
+  const totalCustomers = await prisma.users.count({
+    where: { role: "customer" }
+  });
 
-  const [pendingOrders] = await db("orders")
-    .whereIn("status", ["pending", "processing"])
-    .count("id as count");
+  const pendingOrders = await prisma.orders.count({
+    where: { status: { in: ["pending", "processing"] } }
+  });
 
-  const [lowStockProducts] = await db("weight_variants")
-    .where("stock", "<", 10)
-    .count("id as count");
+  const lowStockProducts = await prisma.weight_variants.count({
+    where: { stock: { lt: 10 } }
+  });
 
   return {
-    total_revenue: parseFloat(revenueAndOrders.total_revenue || 0).toFixed(2),
-    total_orders: parseInt(revenueAndOrders.total_orders || 0),
-    total_customers: parseInt(totalCustomers.count || 0),
-    avg_order_value: parseFloat(revenueAndOrders.avg_order_value || 0).toFixed(2),
-    pending_orders: parseInt(pendingOrders.count || 0),
-    low_stock_products: parseInt(lowStockProducts.count || 0),
+    total_revenue: parseFloat(revenueAndOrders._sum.total || 0).toFixed(2),
+    total_orders: revenueAndOrders._count.id,
+    total_customers: totalCustomers,
+    avg_order_value: parseFloat(revenueAndOrders._avg.total || 0).toFixed(2),
+    pending_orders: pendingOrders,
+    low_stock_products: lowStockProducts,
   };
 }
 
@@ -44,54 +43,65 @@ async function getRevenueAnalytics(period = "daily", dateFrom, dateTo) {
       datePart = "day";
   }
 
-  const query = db("orders")
-    .whereNot("status", "cancelled")
-    .select(
-      db.raw(`DATE_TRUNC('${datePart}', created_at) as period_label`),
-      db.raw("SUM(total) as revenue"),
-      db.raw("COUNT(id) as order_count")
-    )
-    .groupBy("period_label")
-    .orderBy("period_label", "asc");
+  // Use raw query for DATE_TRUNC as Prisma doesn't support it in groupBy yet
+  const result = await prisma.$queryRaw`
+    SELECT 
+      DATE_TRUNC(${datePart}, created_at) as period_label,
+      SUM(total) as revenue,
+      COUNT(id) as order_count
+    FROM orders
+    WHERE status != 'cancelled'
+    ${dateFrom ? prisma.sql`AND created_at >= ${new Date(dateFrom)}` : prisma.sql``}
+    ${dateTo ? prisma.sql`AND created_at <= ${new Date(dateTo)}` : prisma.sql``}
+    GROUP BY period_label
+    ORDER BY period_label ASC
+  `;
 
-  if (dateFrom) query.where("created_at", ">=", dateFrom);
-  if (dateTo) query.where("created_at", "<=", dateTo);
-
-  const result = await query;
   return result.map(row => ({
     period_label: row.period_label,
     revenue: parseFloat(row.revenue || 0).toFixed(2),
-    order_count: parseInt(row.order_count || 0),
+    order_count: Number(row.order_count || 0),
   }));
 }
 
 async function getTopProducts() {
-  return db("order_items as oi")
-    .join("orders as o", "oi.order_id", "o.id")
-    .join("products as p", "oi.product_id", "p.id")
-    .join("categories as c", "p.category_id", "c.id")
-    .whereNot("o.status", "cancelled")
-    .select(
-      "p.name",
-      "c.name as category_name",
-      db.raw("SUM(oi.quantity) as total_quantity_sold"),
-      db.raw("SUM(oi.subtotal) as total_revenue")
-    )
-    .groupBy("p.id", "p.name", "c.name")
-    .orderBy("total_quantity_sold", "desc")
-    .limit(10);
+  const result = await prisma.order_items.groupBy({
+    by: ["product_id", "product_name"],
+    where: {
+      orders: {
+        status: { not: "cancelled" }
+      }
+    },
+    _sum: {
+      quantity: true,
+      subtotal: true
+    },
+    orderBy: {
+      _sum: {
+        quantity: "desc"
+      }
+    },
+    take: 10
+  });
+
+  // Fetch category info separately if needed or rely on product_id
+  return result.map(r => ({
+    name: r.product_name,
+    total_quantity_sold: r._sum.quantity,
+    total_revenue: parseFloat(r._sum.subtotal || 0).toFixed(2)
+  }));
 }
 
 async function getInventoryAnalytics() {
-  return db("weight_variants as wv")
-    .join("products as p", "wv.product_id", "p.id")
-    .where("wv.stock", "<", 10)
-    .select(
-      "p.name as product_name",
-      "wv.label as variant_label",
-      "wv.stock"
-    )
-    .orderBy("wv.stock", "asc");
+  return prisma.weight_variants.findMany({
+    where: { stock: { lt: 10 } },
+    include: { products: { select: { name: true } } },
+    orderBy: { stock: "asc" }
+  }).then(items => items.map(wv => ({
+    product_name: wv.products.name,
+    variant_label: wv.label,
+    stock: wv.stock
+  })));
 }
 
 module.exports = {

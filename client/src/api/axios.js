@@ -38,7 +38,7 @@ api.interceptors.response.use(
             user.accessToken = newAccessToken;
             localStorage.setItem('naturadry_user', JSON.stringify(user));
           }
-          
+
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return api(originalRequest);
         }

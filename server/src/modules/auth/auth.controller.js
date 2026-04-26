@@ -116,6 +116,39 @@ async function verifyEmail(req, res) {
   return sendSuccess(res, { message: "Email verified successfully" });
 }
 
+async function finalizeLogin(req, res) {
+  const { idToken } = req.body;
+  if (!idToken) {
+    throw new ApiError(400, "idToken is required", "VALIDATION_ERROR");
+  }
+
+  const result = await authService.finalizeLoginAfterVerification(idToken);
+  setRefreshCookie(res, result.refreshToken);
+
+  return sendSuccess(res, {
+    accessToken: result.accessToken,
+    user: result.user
+  });
+}
+
+async function firebaseLogin(req, res) {
+  const { idToken, profileData } = req.body;
+  if (!idToken) {
+    throw new ApiError(400, "ID Token is required", "VALIDATION_ERROR");
+  }
+
+  const result = await authService.firebaseLogin(idToken, profileData);
+  setRefreshCookie(res, result.refreshToken);
+
+  return sendSuccess(res, {
+    accessToken: result.accessToken,
+    user: result.user,
+    status: result.status,
+    email: result.email,
+    customToken: result.customToken
+  });
+}
+
 module.exports = {
   register,
   login,
@@ -123,5 +156,7 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
-  verifyEmail
+  verifyEmail,
+  finalizeLogin,
+  firebaseLogin
 };

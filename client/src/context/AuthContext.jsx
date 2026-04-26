@@ -73,7 +73,44 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authApi.loginUser(email, password);
       if (response.success) {
+        if (response.data.status === 'VERIFICATION_REQUIRED') {
+          return response.data; // { status, email, customToken }
+        }
         // response.data contains { accessToken, user }
+        const { user: userData, accessToken } = response.data;
+        const fullUser = { ...userData, accessToken };
+        setUser(fullUser);
+        localStorage.setItem('naturadry_user', JSON.stringify(fullUser));
+        return fullUser;
+      }
+    } catch (error) {
+      throw error.response?.data?.error || error;
+    }
+  };
+
+  const firebaseLogin = async (idToken) => {
+    try {
+      const response = await authApi.firebaseLogin(idToken);
+      if (response.success) {
+        const { user: userData, accessToken } = response.data;
+        // Firebase login now requires verification too — return status
+        if (response.data.status === 'VERIFICATION_REQUIRED') {
+          return response.data; // { status, email, customToken }
+        }
+        const fullUser = { ...userData, accessToken };
+        setUser(fullUser);
+        localStorage.setItem('naturadry_user', JSON.stringify(fullUser));
+        return fullUser;
+      }
+    } catch (error) {
+      throw error.response?.data?.error || error;
+    }
+  };
+
+  const finalizeLogin = async (idToken) => {
+    try {
+      const response = await authApi.finalizeLogin(idToken);
+      if (response.success) {
         const { user: userData, accessToken } = response.data;
         const fullUser = { ...userData, accessToken };
         setUser(fullUser);
@@ -112,7 +149,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateProfile, loading }}>
+    <AuthContext.Provider value={{ user, login, firebaseLogin, finalizeLogin, logout, updateProfile, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );

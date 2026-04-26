@@ -1,13 +1,22 @@
 const bcrypt = require("bcrypt");
-const { db } = require("../../config/db");
-const redis = require("../../config/redis");
+const prisma = require("../../config/prisma");
+const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
 
 async function getProfile(userId) {
-  const user = await db("users")
-    .where({ id: userId })
-    .select("id", "name", "email", "phone", "role", "email_verified", "is_active", "created_at")
-    .first();
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      email_verified: true,
+      is_active: true,
+      created_at: true
+    }
+  });
 
   if (!user) {
     throw new ApiError(404, "User not found", "USER_NOT_FOUND");
@@ -21,17 +30,21 @@ async function updateProfile(userId, payload) {
     return getProfile(userId);
   }
 
-  const updates = {
-    ...payload,
-    updated_at: db.fn.now()
-  };
-
-  await db("users").where({ id: userId }).update(updates);
+  await prisma.users.update({
+    where: { id: userId },
+    data: {
+      ...payload,
+      updated_at: new Date()
+    }
+  });
   return getProfile(userId);
 }
 
 async function changePassword(userId, currentPassword, newPassword) {
-  const user = await db("users").where({ id: userId }).select("password_hash").first();
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: { password_hash: true }
+  });
   if (!user) {
     throw new ApiError(404, "User not found", "USER_NOT_FOUND");
   }
@@ -43,101 +56,122 @@ async function changePassword(userId, currentPassword, newPassword) {
 
   const password_hash = await bcrypt.hash(newPassword, 12);
 
-  await db("users").where({ id: userId }).update({
-    password_hash,
-    updated_at: db.fn.now()
+  await prisma.users.update({
+    where: { id: userId },
+    data: {
+      password_hash,
+      updated_at: new Date()
+    }
   });
 
-  if (redis) {
-    await redis.del(`refresh:${userId}`);
+  if (cache) {
+    await cache.del(`refresh:${userId}`);
   }
 }
 
 async function getAddresses(userId) {
-  return db("addresses")
-    .where({ user_id: userId })
-    .orderBy([
-      { column: "is_default", order: "desc" },
-      { column: "created_at", order: "desc" }
-    ]);
+  return prisma.addresses.findMany({
+    where: { user_id: userId },
+    orderBy: [
+      { is_default: "desc" },
+      { created_at: "desc" }
+    ]
+  });
 }
 
 async function addAddress(userId, payload) {
-  return db.transaction(async (trx) => {
+  return prisma.$transaction(async (tx) => {
     if (payload.is_default) {
-      await trx("addresses").where({ user_id: userId }).update({ is_default: false });
+      await tx.addresses.updateMany({
+        where: { user_id: userId },
+        data: { is_default: false }
+      });
     }
 
-    const [address] = await trx("addresses")
-      .insert({
+    return tx.addresses.create({
+      data: {
         user_id: userId,
         ...payload
-      })
-      .returning("*");
-
-    return address;
+      }
+    });
   });
 }
 
 async function updateAddress(userId, addressId, payload) {
-  return db.transaction(async (trx) => {
-    const address = await trx("addresses").where({ id: addressId, user_id: userId }).first();
+  return prisma.$transaction(async (tx) => {
+    const address = await tx.addresses.findFirst({
+      where: { id: addressId, user_id: userId }
+    });
     if (!address) {
       throw new ApiError(403, "Address not found or unauthorized", "FORBIDDEN");
     }
 
     if (payload.is_default) {
-      await trx("addresses").where({ user_id: userId }).update({ is_default: false });
+      await tx.addresses.updateMany({
+        where: { user_id: userId },
+        data: { is_default: false }
+      });
     }
 
-    const updates = { ...payload, updated_at: trx.fn.now() };
-
-    const [updated] = await trx("addresses")
-      .where({ id: addressId })
-      .update(updates)
-      .returning("*");
-
-    return updated;
+    return tx.addresses.update({
+      where: { id: addressId },
+      data: { 
+        ...payload, 
+        updated_at: new Date() 
+      }
+    });
   });
 }
 
 async function deleteAddress(userId, addressId) {
-  return db.transaction(async (trx) => {
-    const address = await trx("addresses").where({ id: addressId, user_id: userId }).first();
-    if (!address) {
-      throw new ApiError(403, "Address not found or unauthorized", "FORBIDDEN");
-    }
-
-    try {
-      await trx("addresses").where({ id: addressId }).del();
-    } catch (err) {
-      // Postgres foreign key violation code
-      if (err.code === "23503" || err.code === "ER_ROW_IS_REFERENCED_2") {
-        throw new ApiError(422, "Cannot delete address because it is referenced by an order", "ADDRESS_REFERENCED");
-      }
-      throw err;
-    }
+  const address = await prisma.addresses.findFirst({
+    where: { id: addressId, user_id: userId }
   });
+  if (!address) {
+    throw new ApiError(403, "Address not found or unauthorized", "FORBIDDEN");
+  }
+
+  try {
+    await prisma.addresses.delete({
+      where: { id: addressId }
+    });
+  } catch (err) {
+    // Prisma Foreign Key violation error code for Postgres
+    if (err.code === "P2003") {
+      throw new ApiError(422, "Cannot delete address because it is referenced by an order", "ADDRESS_REFERENCED");
+    }
+    throw err;
+  }
 }
 
 async function listUsers(query) {
   const { page, limit, role } = query;
-  const offset = (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
-  const dbQuery = db("users");
+  const where = {};
   if (role) {
-    dbQuery.where({ role });
+    where.role = role;
   }
 
-  const totalRow = await dbQuery.clone().count({ count: "*" }).first();
-  const total = Number(totalRow.count || 0);
-
-  const users = await dbQuery
-    .clone()
-    .select("id", "name", "email", "phone", "role", "email_verified", "is_active", "created_at")
-    .orderBy("created_at", "desc")
-    .limit(limit)
-    .offset(offset);
+  const [total, users] = await prisma.$transaction([
+    prisma.users.count({ where }),
+    prisma.users.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        email_verified: true,
+        is_active: true,
+        created_at: true
+      },
+      orderBy: { created_at: "desc" },
+      take: limit,
+      skip
+    })
+  ]);
 
   return {
     users,
@@ -151,35 +185,58 @@ async function listUsers(query) {
 }
 
 async function getUserDetails(userId) {
-  const user = await db("users")
-    .where({ id: userId })
-    .select("id", "name", "email", "phone", "role", "email_verified", "is_active", "created_at")
-    .first();
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      email_verified: true,
+      is_active: true,
+      created_at: true,
+      _count: {
+        select: { orders: true }
+      }
+    }
+  });
 
   if (!user) {
     throw new ApiError(404, "User not found", "USER_NOT_FOUND");
   }
 
-  const orderCountRow = await db("orders").where({ user_id: userId }).count({ count: "*" }).first();
-  user.order_count = Number(orderCountRow.count || 0);
+  // Map _count.orders to order_count for compatibility
+  const result = { ...user, order_count: user._count.orders };
+  delete result._count;
 
-  return user;
+  return result;
 }
 
 async function updateUserStatus(userId, isActive) {
-  const [user] = await db("users")
-    .where({ id: userId })
-    .update({
-      is_active: isActive,
-      updated_at: db.fn.now()
-    })
-    .returning(["id", "name", "email", "is_active", "role"]);
+  try {
+    const user = await prisma.users.update({
+      where: { id: userId },
+      data: {
+        is_active: isActive,
+        updated_at: new Date()
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        is_active: true,
+        role: true
+      }
+    });
 
-  if (!user) {
-    throw new ApiError(404, "User not found", "USER_NOT_FOUND");
+    return user;
+  } catch (err) {
+    if (err.code === "P2025") {
+      throw new ApiError(404, "User not found", "USER_NOT_FOUND");
+    }
+    throw err;
   }
-
-  return user;
 }
 
 module.exports = {

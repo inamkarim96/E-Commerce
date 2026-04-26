@@ -1,4 +1,4 @@
-const { db } = require("../../config/db");
+const prisma = require("../../config/prisma");
 const ApiError = require("../../utils/apiError");
 
 function toNumber(value) {
@@ -6,7 +6,7 @@ function toNumber(value) {
 }
 
 async function validateCoupon(code, subtotal) {
-  const coupon = await db("coupons").where({ code }).first();
+  const coupon = await prisma.coupons.findUnique({ where: { code } });
 
   if (!coupon) {
     return { valid: false, reason: "Invalid coupon code" };
@@ -46,55 +46,57 @@ async function validateCoupon(code, subtotal) {
 }
 
 async function listAllCoupons() {
-  return db("coupons").orderBy("created_at", "desc");
+  return prisma.coupons.findMany({
+    orderBy: { created_at: "desc" }
+  });
 }
 
 async function createCoupon(data) {
-  const existing = await db("coupons").where({ code: data.code }).first();
+  const existing = await prisma.coupons.findUnique({ where: { code: data.code } });
   if (existing) {
     throw new ApiError(409, "Coupon code already exists", "DUPLICATE_COUPON");
   }
 
-  const [coupon] = await db("coupons")
-    .insert({
+  return prisma.coupons.create({
+    data: {
       ...data,
-      created_at: db.fn.now()
-    })
-    .returning("*");
-
-  return coupon;
+      created_at: new Date()
+    }
+  });
 }
 
 async function updateCoupon(id, data) {
-  const [coupon] = await db("coupons")
-    .where({ id })
-    .update({
-      ...data,
-      updated_at: db.fn.now()
-    })
-    .returning("*");
-
-  if (!coupon) {
-    throw new ApiError(404, "Coupon not found", "NOT_FOUND");
+  try {
+    return await prisma.coupons.update({
+      where: { id },
+      data: {
+        ...data,
+        updated_at: new Date()
+      }
+    });
+  } catch (err) {
+    if (err.code === "P2025") {
+      throw new ApiError(404, "Coupon not found", "NOT_FOUND");
+    }
+    throw err;
   }
-
-  return coupon;
 }
 
 async function deactivateCoupon(id) {
-  const [coupon] = await db("coupons")
-    .where({ id })
-    .update({
-      is_active: false,
-      updated_at: db.fn.now()
-    })
-    .returning("*");
-
-  if (!coupon) {
-    throw new ApiError(404, "Coupon not found", "NOT_FOUND");
+  try {
+    return await prisma.coupons.update({
+      where: { id },
+      data: {
+        is_active: false,
+        updated_at: new Date()
+      }
+    });
+  } catch (err) {
+    if (err.code === "P2025") {
+      throw new ApiError(404, "Coupon not found", "NOT_FOUND");
+    }
+    throw err;
   }
-
-  return coupon;
 }
 
 module.exports = {

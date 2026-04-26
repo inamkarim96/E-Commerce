@@ -9,7 +9,6 @@ const schema = Joi.object({
     .default("development"),
   PORT: Joi.number().integer().min(1).max(65535).default(5000),
   DATABASE_URL: Joi.string().uri().required(),
-  REDIS_URL: Joi.string().uri({ scheme: ["redis", "rediss"] }).allow("").optional(),
   FRONTEND_URL: Joi.string().uri().required(),
   BACKEND_URL: Joi.string().uri().default("http://localhost:8080"),
   JWT_ACCESS_SECRET: Joi.string().min(16).required(),
@@ -25,7 +24,10 @@ const schema = Joi.object({
   JAZZCASH_PASSWORD: Joi.string().allow("").optional(),
   JAZZCASH_INTEGRITY_SALT: Joi.string().allow("").optional(),
   STRIPE_SECRET_KEY: Joi.string().allow("").optional(),
-  STRIPE_WEBHOOK_SECRET: Joi.string().allow("").optional()
+  STRIPE_WEBHOOK_SECRET: Joi.string().allow("").optional(),
+  ADMIN_EMAIL: Joi.string().email().required(),
+  ADMIN_PHONE: Joi.string().required(),
+  ADMIN_PASSWORD: Joi.string().required()
 })
   .unknown()
   .required();
@@ -59,7 +61,10 @@ const {
   JAZZCASH_PASSWORD,
   JAZZCASH_INTEGRITY_SALT,
   STRIPE_SECRET_KEY,
-  STRIPE_WEBHOOK_SECRET
+  STRIPE_WEBHOOK_SECRET,
+  ADMIN_EMAIL,
+  ADMIN_PHONE,
+  ADMIN_PASSWORD
 } = value;
 
 module.exports = {
@@ -82,5 +87,8 @@ module.exports = {
   JAZZCASH_PASSWORD,
   JAZZCASH_INTEGRITY_SALT,
   STRIPE_SECRET_KEY,
-  STRIPE_WEBHOOK_SECRET
+  STRIPE_WEBHOOK_SECRET,
+  ADMIN_EMAIL,
+  ADMIN_PHONE,
+  ADMIN_PASSWORD
 };

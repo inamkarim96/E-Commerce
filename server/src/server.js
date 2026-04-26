@@ -1,10 +1,12 @@
 const app = require("./app");
+
 const { PORT } = require("./config/env");
-const { connectDatabase } = require("./config/db");
+const prisma = require("./config/prisma");
 
 async function startServer() {
   try {
-    await connectDatabase();
+    await prisma.$connect();
+    console.log("Connected to PostgreSQL via Prisma");
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

@@ -1,4 +1,4 @@
-const { db } = require("../../config/db");
+const prisma = require("../../config/prisma");
 const ApiError = require("../../utils/apiError");
 const slugify = require("../../utils/slugify");
 
@@ -7,9 +7,13 @@ async function ensureUniqueSlug(name, excludeId = null) {
   let slug = baseSlug;
 
   for (let i = 0; i < 15; i += 1) {
-    const query = db("products").where({ slug });
-    if (excludeId) query.whereNot({ id: excludeId });
-    const existing = await query.first();
+    const existing = await prisma.products.findFirst({
+      where: {
+        slug,
+        ...(excludeId ? { NOT: { id: excludeId } } : {})
+      },
+      select: { id: true }
+    });
     if (!existing) return slug;
     slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
   }
@@ -32,46 +36,31 @@ async function fetchVariantsByProductIds(productIds, trx = db) {
   }, {});
 }
 
-async function fetchReviewStatsByProductIds(productIds, trx = db) {
+async function fetchReviewStatsByProductIds(productIds) {
   if (!productIds.length) return {};
 
-  const rows = await trx("reviews")
-    .whereIn("product_id", productIds)
-    .groupBy("product_id")
-    .select("product_id")
-    .avg({ avg_rating: "rating" })
-    .count({ review_count: "*" });
+  const stats = await prisma.reviews.groupBy({
+    by: ["product_id"],
+    where: { product_id: { in: productIds } },
+    _avg: { rating: true },
+    _count: { id: true }
+  });
 
-  return rows.reduce((acc, row) => {
+  return stats.reduce((acc, row) => {
     acc[row.product_id] = {
-      avg_rating: row.avg_rating ? Number(row.avg_rating) : 0,
-      review_count: Number(row.review_count || 0)
+      avg_rating: row._avg.rating ? Number(row._avg.rating.toFixed(1)) : 0,
+      review_count: Number(row._count.id || 0)
     };
     return acc;
   }, {});
 }
 
-function mapProduct(row, variantsMap, reviewMap) {
+function mapProduct(row, reviewMap) {
   const review = reviewMap[row.id] || { avg_rating: 0, review_count: 0 };
   return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    description: row.description,
-    base_price: row.base_price,
-    stock: row.stock,
-    images: row.images || [],
-    is_featured: row.is_featured,
-    is_active: row.is_active,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    category: {
-      id: row.category_id,
-      name: row.category_name,
-      slug: row.category_slug,
-      image: row.category_image
-    },
-    weight_variants: variantsMap[row.id] || [],
+    ...row,
+    category: row.categories,
+    weight_variants: row.weight_variants || [],
     avg_rating: review.avg_rating,
     review_count: review.review_count
   };
@@ -94,74 +83,51 @@ function applyListFilters(query, filters) {
 async function listProducts(filters) {
   const page = Number(filters.page || 1);
   const limit = Number(filters.limit || 10);
-  const offset = (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
-  const baseQuery = db("products as p")
-    .join("categories as c", "p.category_id", "c.id")
-    .select(
-      "p.id",
-      "p.category_id",
-      "p.name",
-      "p.slug",
-      "p.description",
-      "p.base_price",
-      "p.stock",
-      "p.images",
-      "p.is_featured",
-      "p.is_active",
-      "p.created_at",
-      "p.updated_at",
-      "c.name as category_name",
-      "c.slug as category_slug",
-      "c.image as category_image"
-    );
-
-  applyListFilters(baseQuery, filters);
+  const where = { is_active: true };
+  if (filters.category) {
+    where.categories = { slug: filters.category };
+  }
+  if (filters.min_price !== undefined) {
+    where.base_price = { gte: filters.min_price };
+  }
+  if (filters.max_price !== undefined) {
+    where.base_price = { ...where.base_price, lte: filters.max_price };
+  }
   if (filters.featuredOnly) {
-    baseQuery.andWhere("p.is_featured", true);
+    where.is_featured = true;
   }
 
-  const totalRow = await db("products as p")
-    .join("categories as c", "p.category_id", "c.id")
-    .modify((queryBuilder) => {
-      applyListFilters(queryBuilder, filters);
-      if (filters.featuredOnly) {
-        queryBuilder.andWhere("p.is_featured", true);
-      }
-    })
-    .count({ count: "p.id" })
-    .first();
-  const total = Number(totalRow?.count || 0);
-
+  let orderBy = { created_at: "desc" };
   if (filters.sort === "price_asc") {
-    baseQuery.orderBy("p.base_price", "asc");
+    orderBy = { base_price: "asc" };
   } else if (filters.sort === "price_desc") {
-    baseQuery.orderBy("p.base_price", "desc");
+    orderBy = { base_price: "desc" };
   } else if (filters.sort === "popular") {
-    baseQuery
-      .leftJoin("reviews as r", "p.id", "r.product_id")
-      .count({ popularity: "r.id" })
-      .groupBy(
-        "p.id",
-        "c.id",
-        "c.name",
-        "c.slug",
-        "c.image"
-      )
-      .orderBy("popularity", "desc")
-      .orderBy("p.created_at", "desc");
-  } else {
-    baseQuery.orderBy("p.created_at", "desc");
+    orderBy = { reviews: { _count: "desc" } };
   }
 
-  const rows = await baseQuery.limit(limit).offset(offset);
-  const productIds = rows.map((row) => row.id);
-  const [variantsMap, reviewMap] = await Promise.all([
-    fetchVariantsByProductIds(productIds),
-    fetchReviewStatsByProductIds(productIds)
+  const [total, rows] = await prisma.$transaction([
+    prisma.products.count({ where }),
+    prisma.products.findMany({
+      where,
+      include: {
+        categories: true,
+        weight_variants: {
+          orderBy: { weight_grams: "asc" }
+        }
+      },
+      orderBy,
+      take: limit,
+      skip
+    })
   ]);
 
-  const products = rows.map((row) => mapProduct(row, variantsMap, reviewMap));
+  const productIds = rows.map((row) => row.id);
+  const reviewMap = await fetchReviewStatsByProductIds(productIds);
+
+  const products = rows.map((row) => mapProduct(row, reviewMap));
   return {
     products,
     pagination: {
@@ -176,41 +142,27 @@ async function listProducts(filters) {
 async function listAdminProducts(filters) {
   const page = Number(filters.page || 1);
   const limit = Number(filters.limit || 10);
-  const offset = (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
-  const baseQuery = db("products as p")
-    .join("categories as c", "p.category_id", "c.id")
-    .select(
-      "p.id",
-      "p.category_id",
-      "p.name",
-      "p.slug",
-      "p.description",
-      "p.base_price",
-      "p.stock",
-      "p.images",
-      "p.is_featured",
-      "p.is_active",
-      "p.created_at",
-      "p.updated_at",
-      "c.name as category_name",
-      "c.slug as category_slug",
-      "c.image as category_image"
-    );
-
-  const totalRow = await db("products as p").count({ count: "p.id" }).first();
-  const total = Number(totalRow?.count || 0);
-
-  baseQuery.orderBy("p.created_at", "desc");
-
-  const rows = await baseQuery.limit(limit).offset(offset);
-  const productIds = rows.map((row) => row.id);
-  const [variantsMap, reviewMap] = await Promise.all([
-    fetchVariantsByProductIds(productIds),
-    fetchReviewStatsByProductIds(productIds)
+  const [total, rows] = await prisma.$transaction([
+    prisma.products.count(),
+    prisma.products.findMany({
+      include: {
+        categories: true,
+        weight_variants: {
+          orderBy: { weight_grams: "asc" }
+        }
+      },
+      orderBy: { created_at: "desc" },
+      take: limit,
+      skip
+    })
   ]);
 
-  const products = rows.map((row) => mapProduct(row, variantsMap, reviewMap));
+  const productIds = rows.map((row) => row.id);
+  const reviewMap = await fetchReviewStatsByProductIds(productIds);
+
+  const products = rows.map((row) => mapProduct(row, reviewMap));
   return {
     products,
     pagination: {
@@ -231,49 +183,37 @@ async function getFeaturedProducts() {
 async function searchProducts({ q, page, limit }) {
   const pageNum = Number(page || 1);
   const limitNum = Number(limit || 10);
-  const offset = (pageNum - 1) * limitNum;
+  const skip = (pageNum - 1) * limitNum;
 
-  const query = db("products as p")
-    .join("categories as c", "p.category_id", "c.id")
-    .where("p.is_active", true)
-    .andWhere((builder) => {
-      builder.whereILike("p.name", `%${q}%`).orWhereILike("p.description", `%${q}%`);
-    });
+  const where = {
+    is_active: true,
+    OR: [
+      { name: { contains: q, mode: 'insensitive' } },
+      { description: { contains: q, mode: 'insensitive' } }
+    ]
+  };
 
-  const totalRow = await query.clone().count({ count: "p.id" }).first();
-  const total = Number(totalRow?.count || 0);
-
-  const rows = await query
-    .clone()
-    .select(
-      "p.id",
-      "p.category_id",
-      "p.name",
-      "p.slug",
-      "p.description",
-      "p.base_price",
-      "p.stock",
-      "p.images",
-      "p.is_featured",
-      "p.is_active",
-      "p.created_at",
-      "p.updated_at",
-      "c.name as category_name",
-      "c.slug as category_slug",
-      "c.image as category_image"
-    )
-    .orderBy("p.created_at", "desc")
-    .limit(limitNum)
-    .offset(offset);
-
-  const ids = rows.map((row) => row.id);
-  const [variantsMap, reviewMap] = await Promise.all([
-    fetchVariantsByProductIds(ids),
-    fetchReviewStatsByProductIds(ids)
+  const [total, rows] = await prisma.$transaction([
+    prisma.products.count({ where }),
+    prisma.products.findMany({
+      where,
+      include: {
+        categories: true,
+        weight_variants: {
+          orderBy: { weight_grams: "asc" }
+        }
+      },
+      orderBy: { created_at: "desc" },
+      take: limitNum,
+      skip
+    })
   ]);
 
+  const ids = rows.map((row) => row.id);
+  const reviewMap = await fetchReviewStatsByProductIds(ids);
+
   return {
-    products: rows.map((row) => mapProduct(row, variantsMap, reviewMap)),
+    products: rows.map((row) => mapProduct(row, reviewMap)),
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -283,48 +223,33 @@ async function searchProducts({ q, page, limit }) {
   };
 }
 
-async function getProductById(id, includeInactive = false, trx = db) {
-  const query = trx("products as p")
-    .join("categories as c", "p.category_id", "c.id")
-    .where("p.id", id)
-    .select(
-      "p.id",
-      "p.category_id",
-      "p.name",
-      "p.slug",
-      "p.description",
-      "p.base_price",
-      "p.stock",
-      "p.images",
-      "p.is_featured",
-      "p.is_active",
-      "p.created_at",
-      "p.updated_at",
-      "c.name as category_name",
-      "c.slug as category_slug",
-      "c.image as category_image"
-    )
-    .first();
+async function getProductById(id, includeInactive = false) {
+  const row = await prisma.products.findUnique({
+    where: { 
+      id,
+      ...(includeInactive ? {} : { is_active: true })
+    },
+    include: {
+      categories: true,
+      weight_variants: {
+        orderBy: { weight_grams: "asc" }
+      }
+    }
+  });
 
-  if (!includeInactive) {
-    query.andWhere("p.is_active", true);
-  }
-
-  const row = await query;
   if (!row) {
     throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
   }
 
-  const [variantsMap, reviewMap] = await Promise.all([
-    fetchVariantsByProductIds([row.id]),
-    fetchReviewStatsByProductIds([row.id])
-  ]);
-
-  return mapProduct(row, variantsMap, reviewMap);
+  const reviewMap = await fetchReviewStatsByProductIds([row.id]);
+  return mapProduct(row, reviewMap);
 }
 
 async function getProductBySlug(slug) {
-  const row = await db("products").where({ slug, is_active: true }).first();
+  const row = await prisma.products.findUnique({
+    where: { slug, is_active: true },
+    select: { id: true }
+  });
   if (!row) {
     throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
   }
@@ -332,16 +257,19 @@ async function getProductBySlug(slug) {
 }
 
 async function createProduct(payload) {
-  return db.transaction(async (trx) => {
-    const category = await trx("categories").where({ id: payload.category_id }).first();
+  return prisma.$transaction(async (tx) => {
+    const category = await tx.categories.findUnique({
+      where: { id: payload.category_id }
+    });
     if (!category) {
       throw new ApiError(400, "Invalid category", "INVALID_CATEGORY");
     }
 
     const slug = await ensureUniqueSlug(payload.name);
     const totalVariantStock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
-    const [product] = await trx("products")
-      .insert({
+    
+    const product = await tx.products.create({
+      data: {
         category_id: payload.category_id,
         name: payload.name,
         slug,
@@ -350,126 +278,130 @@ async function createProduct(payload) {
         stock: payload.weight_variants?.length > 0 ? totalVariantStock : (payload.stock ?? 0),
         images: payload.images || [],
         is_featured: payload.is_featured ?? false,
-        is_active: payload.is_active ?? true
-      })
-      .returning("*");
+        is_active: payload.is_active ?? true,
+        weight_variants: {
+          create: payload.weight_variants.map((v) => ({
+            label: v.label,
+            weight_grams: v.weight_grams,
+            price: v.price,
+            stock: v.stock ?? 0
+          }))
+        }
+      }
+    });
 
-    const variantRows = payload.weight_variants.map((variant) => ({
-      product_id: product.id,
-      label: variant.label,
-      weight_grams: variant.weight_grams,
-      price: variant.price,
-      stock: variant.stock ?? 0
-    }));
-    await trx("weight_variants").insert(variantRows);
-
-    return getProductById(product.id, true, trx);
+    return getProductById(product.id, true);
   });
 }
 
 async function updateProduct(id, payload) {
-  return db.transaction(async (trx) => {
-    const existing = await trx("products").where({ id }).first();
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.products.findUnique({ where: { id } });
     if (!existing) {
       throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
     }
 
-    const updates = {
-      updated_at: trx.fn.now()
+    const data = {
+      updated_at: new Date()
     };
 
     if (payload.category_id) {
-      const category = await trx("categories").where({ id: payload.category_id }).first();
+      const category = await tx.categories.findUnique({ where: { id: payload.category_id } });
       if (!category) {
         throw new ApiError(400, "Invalid category", "INVALID_CATEGORY");
       }
-      updates.category_id = payload.category_id;
+      data.category_id = payload.category_id;
     }
     if (payload.name && payload.name !== existing.name) {
-      updates.name = payload.name;
-      updates.slug = await ensureUniqueSlug(payload.name, id);
+      data.name = payload.name;
+      data.slug = await ensureUniqueSlug(payload.name, id);
     }
     if (Object.prototype.hasOwnProperty.call(payload, "description")) {
-      updates.description = payload.description;
+      data.description = payload.description;
     }
     if (Object.prototype.hasOwnProperty.call(payload, "base_price")) {
-      updates.base_price = payload.base_price;
+      data.base_price = payload.base_price;
     }
     if (Object.prototype.hasOwnProperty.call(payload, "stock")) {
-      updates.stock = payload.stock;
+      data.stock = payload.stock;
     }
     if (Object.prototype.hasOwnProperty.call(payload, "images")) {
-      updates.images = payload.images;
+      data.images = payload.images;
     }
     if (Object.prototype.hasOwnProperty.call(payload, "is_featured")) {
-      updates.is_featured = payload.is_featured;
+      data.is_featured = payload.is_featured;
     }
     if (Object.prototype.hasOwnProperty.call(payload, "is_active")) {
-      updates.is_active = payload.is_active;
+      data.is_active = payload.is_active;
     }
 
     if (payload.weight_variants?.length > 0) {
-      updates.stock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+      data.stock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+      
+      // Update variants: delete and recreate for simplicity
+      await tx.weight_variants.deleteMany({ where: { product_id: id } });
+      data.weight_variants = {
+        create: payload.weight_variants.map((v) => ({
+          label: v.label,
+          weight_grams: v.weight_grams,
+          price: v.price,
+          stock: v.stock ?? 0
+        }))
+      };
     }
 
-    await trx("products").where({ id }).update(updates);
+    await tx.products.update({
+      where: { id },
+      data
+    });
 
-    if (payload.weight_variants) {
-      await trx("weight_variants").where({ product_id: id }).del();
-      const variantRows = payload.weight_variants.map((variant) => ({
-        product_id: id,
-        label: variant.label,
-        weight_grams: variant.weight_grams,
-        price: variant.price,
-        stock: variant.stock ?? 0
-      }));
-      await trx("weight_variants").insert(variantRows);
-    }
-
-    return getProductById(id, true, trx);
+    return getProductById(id, true);
   });
 }
 
 async function updateStock(id, stock) {
-  const [updated] = await db("products")
-    .where({ id })
-    .update({ stock, updated_at: db.fn.now() })
-    .returning("*");
-
-  if (!updated) {
-    throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
+  try {
+    await prisma.products.update({
+      where: { id },
+      data: { stock, updated_at: new Date() }
+    });
+    return getProductById(id, true);
+  } catch (err) {
+    if (err.code === "P2025") {
+      throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
+    }
+    throw err;
   }
-
-  return getProductById(id, true);
 }
 
 async function softDeleteProduct(id) {
-  const [updated] = await db("products")
-    .where({ id })
-    .update({ is_active: false, updated_at: db.fn.now() })
-    .returning("id");
-
-  if (!updated) {
-    throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
+  try {
+    await prisma.products.update({
+      where: { id },
+      data: { is_active: false, updated_at: new Date() }
+    });
+  } catch (err) {
+    if (err.code === "P2025") {
+      throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
+    }
+    throw err;
   }
 }
 
 async function appendProductImage(id, imageUrl) {
-  const product = await db("products").where({ id }).first();
+  const product = await prisma.products.findUnique({ where: { id } });
   if (!product) {
     throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
   }
 
   const images = Array.isArray(product.images) ? product.images : [];
-  const [updated] = await db("products")
-    .where({ id })
-    .update({
+  return prisma.products.update({
+    where: { id },
+    data: {
       images: [...images, imageUrl],
-      updated_at: db.fn.now()
-    })
-    .returning("*");
-
-  return updated;
+      updated_at: new Date()
+    }
+  });
 }
 
 module.exports = {

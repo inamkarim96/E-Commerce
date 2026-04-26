@@ -24,3 +24,19 @@ export const updateProfile = async (userData) => {
   const response = await api.put('/users/me', userData);
   return response.data;
 };
+export const verifyEmail = async (token) => {
+  const response = await api.post(`/auth/verify-email?token=${token}`);
+  return response.data;
+};
+
+export const firebaseLogin = async (idToken) => {
+  const response = await api.post('/auth/firebase-login', { idToken });
+  return response.data;
+};
+
+export const finalizeLogin = async (idToken) => {
+  const response = await api.post('/auth/finalize-login', { idToken });
+  return response.data;
+};
+
+

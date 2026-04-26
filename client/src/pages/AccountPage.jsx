@@ -19,6 +19,23 @@ const AccountPage = () => {
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
+  // Auto-redirect Admin to Admin Dashboard
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      navigate('/admin', { replace: true });
+    }
+  }, [user, navigate]);
+
+  // Sync profile form when user data loads
+  useEffect(() => {
+    if (user) {
+      setProfileForm({ 
+        name: user.name || '', 
+        phone: user.phone || '' 
+      });
+    }
+  }, [user]);
+
   if (!user) return <Navigate to="/login" />;
 
   //   Fetch orders  when tab is opened

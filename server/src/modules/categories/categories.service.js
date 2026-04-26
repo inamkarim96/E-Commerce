@@ -1,4 +1,4 @@
-const { db } = require("../../config/db");
+const prisma = require("../../config/prisma");
 const ApiError = require("../../utils/apiError");
 const slugify = require("../../utils/slugify");
 
@@ -30,11 +30,13 @@ async function buildUniqueCategorySlug(name, excludeId = null) {
   let slug = base;
 
   for (let i = 0; i < 10; i += 1) {
-    const query = db("categories").where({ slug });
-    if (excludeId) {
-      query.whereNot({ id: excludeId });
-    }
-    const existing = await query.first();
+    const existing = await prisma.categories.findFirst({
+      where: {
+        slug,
+        ...(excludeId ? { NOT: { id: excludeId } } : {})
+      },
+      select: { id: true }
+    });
     
     if (!existing) return slug;
     slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
@@ -44,23 +46,25 @@ async function buildUniqueCategorySlug(name, excludeId = null) {
 }
 
 async function listCategories() {
-  const categories = await db("categories as c")
-    .select("c.*")
-    .leftJoin("products as p", function() {
-      this.on("c.id", "p.category_id").andOn("p.is_active", "=", db.raw("?", [true]));
-    })
-    .count("p.id as product_count")
-    .groupBy("c.id")
-    .orderBy("c.created_at", "desc");
+  const categories = await prisma.categories.findMany({
+    include: {
+      _count: {
+        select: { products: true } // Simplified: count all products
+      }
+    },
+    orderBy: { created_at: "desc" }
+  });
 
   return categories.map((cat) => ({
     ...cat,
-    product_count: Number(cat.product_count || 0)
+    product_count: cat._count.products
   }));
 }
 
 async function getCategoryById(id) {
-  const category = await db("categories").where({ id }).first();
+  const category = await prisma.categories.findUnique({
+    where: { id }
+  });
   if (!category) {
     throw new ApiError(404, "Category not found", "CATEGORY_NOT_FOUND");
   }
@@ -69,55 +73,50 @@ async function getCategoryById(id) {
 
 async function createCategory(payload) {
   const slug = await buildUniqueCategorySlug(payload.name);
-  const [category] = await db("categories")
-    .insert({
+  return prisma.categories.create({
+    data: {
       name: payload.name,
       slug,
       image: payload.image || null
-    })
-    .returning("*");
-  
-  return category;
+    }
+  });
 }
 
 async function updateCategory(id, payload) {
-  const existing = await db("categories").where({ id }).first();
+  const existing = await prisma.categories.findUnique({ where: { id } });
   if (!existing) {
     throw new ApiError(404, "Category not found", "CATEGORY_NOT_FOUND");
   }
 
-  const updates = { updated_at: db.fn.now() };
+  const data = { updated_at: new Date() };
 
   if (payload.name && payload.name !== existing.name) {
-    updates.name = payload.name;
-    updates.slug = await buildUniqueCategorySlug(payload.name, id);
+    data.name = payload.name;
+    data.slug = await buildUniqueCategorySlug(payload.name, id);
   }
   if (payload.image !== undefined) {
-    updates.image = payload.image || null;
+    data.image = payload.image || null;
   }
 
-  const [updated] = await db("categories")
-    .where({ id })
-    .update(updates)
-    .returning("*");
-
-  return updated;
+  return prisma.categories.update({
+    where: { id },
+    data
+  });
 }
 
 async function deleteCategory(id) {
-  const category = await db("categories as c")
-    .where("c.id", id)
-    .leftJoin("products as p", "c.id", "p.category_id")
-    .select("c.id")
-    .count("p.id as product_count")
-    .groupBy("c.id")
-    .first();
+  const category = await prisma.categories.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { products: true } }
+    }
+  });
 
   if (!category) {
     throw new ApiError(404, "Category not found", "CATEGORY_NOT_FOUND");
   }
 
-  if (Number(category.product_count) > 0) {
+  if (category._count.products > 0) {
     throw new ApiError(
       400,
       "Cannot delete category with linked products",
@@ -125,16 +124,18 @@ async function deleteCategory(id) {
     );
   }
 
-  await db("categories").where({ id }).del();
+  await prisma.categories.delete({ where: { id } });
 }
 
 async function initializeDefaults() {
-  const existingCount = await db("categories").count({ count: "*" }).first();
-  if (Number(existingCount.count) > 0) {
+  const existingCount = await prisma.categories.count();
+  if (existingCount > 0) {
     return { message: "Categories already exist", count: 0 };
   }
 
-  await db("categories").insert(PREDEFINED_CATEGORIES);
+  await prisma.categories.createMany({
+    data: PREDEFINED_CATEGORIES
+  });
   return { message: "Default categories initialized", count: PREDEFINED_CATEGORIES.length };
 }
 

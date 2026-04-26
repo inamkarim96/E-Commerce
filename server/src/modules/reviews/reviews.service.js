@@ -1,50 +1,49 @@
-const { db } = require("../../config/db");
-const redis = require("../../config/redis");
+const prisma = require("../../config/prisma");
+const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
 
 async function updateProductRatingCache(productId) {
-  if (!redis) return;
+  if (!cache) return;
 
-  const result = await db("reviews")
-    .where({ product_id: productId })
-    .avg("rating as avg_rating")
-    .count("id as total_count")
-    .first();
+  const stats = await prisma.reviews.aggregate({
+    where: { product_id: productId },
+    _avg: { rating: true },
+    _count: { id: true }
+  });
 
-  const avgRating = parseFloat(result.avg_rating || 0).toFixed(1);
-  const totalCount = parseInt(result.total_count || 0);
+  const avgRating = parseFloat(stats._avg.rating || 0).toFixed(1);
+  const totalCount = stats._count.id;
 
-  await redis.set(`product:rating:${productId}`, JSON.stringify({ avg_rating: avgRating, total_count: totalCount }), "EX", 3600);
+  await cache.set(`product:rating:${productId}`, JSON.stringify({ avg_rating: avgRating, total_count: totalCount }), "EX", 3600);
 }
 
 async function getProductReviews(productId, { page = 1, limit = 10 }) {
-  const offset = (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
-  const reviews = await db("reviews as r")
-    .join("users as u", "r.user_id", "u.id")
-    .where("r.product_id", productId)
-    .select(
-      "r.id",
-      "r.rating",
-      "r.title",
-      "r.body",
-      "r.created_at",
-      "u.name as user_name"
-    )
-    .orderBy("r.created_at", "desc")
-    .limit(limit)
-    .offset(offset);
-
-  const stats = await db("reviews")
-    .where({ product_id: productId })
-    .avg("rating as avg_rating")
-    .count("id as total_count")
-    .first();
+  const [reviews, stats] = await prisma.$transaction([
+    prisma.reviews.findMany({
+      where: { product_id: productId },
+      include: {
+        users: { select: { name: true } }
+      },
+      orderBy: { created_at: "desc" },
+      take: limit,
+      skip
+    }),
+    prisma.reviews.aggregate({
+      where: { product_id: productId },
+      _avg: { rating: true },
+      _count: { id: true }
+    })
+  ]);
 
   return {
-    reviews,
-    avg_rating: parseFloat(stats.avg_rating || 0).toFixed(1),
-    total_count: parseInt(stats.total_count || 0),
+    reviews: reviews.map(r => ({
+      ...r,
+      user_name: r.users?.name
+    })),
+    avg_rating: parseFloat(stats._avg.rating || 0).toFixed(1),
+    total_count: stats._count.id,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit)
@@ -54,36 +53,44 @@ async function getProductReviews(productId, { page = 1, limit = 10 }) {
 
 async function createReview(userId, { product_id, rating, title, body }) {
   // Purchase verification
-  const purchase = await db("orders as o")
-    .join("order_items as oi", "o.id", "oi.order_id")
-    .where("o.user_id", userId)
-    .where("oi.product_id", product_id)
-    .where("o.status", "delivered")
-    .first();
+  const purchase = await prisma.orders.findFirst({
+    where: {
+      user_id: userId,
+      status: "delivered",
+      order_items: {
+        some: { product_id }
+      }
+    }
+  });
 
   if (!purchase) {
     throw new ApiError(403, "You can only review products you have purchased and received.", "PURCHASE_REQUIRED");
   }
 
   // Duplicate check
-  const existing = await db("reviews")
-    .where({ user_id: userId, product_id })
-    .first();
+  const existing = await prisma.reviews.findUnique({
+    where: {
+      user_id_product_id: {
+        user_id: userId,
+        product_id
+      }
+    }
+  });
 
   if (existing) {
     throw new ApiError(409, "You have already reviewed this product.", "DUPLICATE_REVIEW");
   }
 
-  const [review] = await db("reviews")
-    .insert({
+  const review = await prisma.reviews.create({
+    data: {
       user_id: userId,
       product_id,
       rating,
       title,
       body,
-      created_at: db.fn.now()
-    })
-    .returning("*");
+      created_at: new Date()
+    }
+  });
 
   // Recalculate and cache
   await updateProductRatingCache(product_id);
@@ -92,7 +99,9 @@ async function createReview(userId, { product_id, rating, title, body }) {
 }
 
 async function deleteReview(userId, reviewId) {
-  const review = await db("reviews").where({ id: reviewId }).first();
+  const review = await prisma.reviews.findUnique({
+    where: { id: reviewId }
+  });
   if (!review) {
     throw new ApiError(404, "Review not found", "NOT_FOUND");
   }
@@ -101,17 +110,17 @@ async function deleteReview(userId, reviewId) {
     throw new ApiError(403, "Not authorized to delete this review", "FORBIDDEN");
   }
 
-  await db("reviews").where({ id: reviewId }).del();
+  await prisma.reviews.delete({ where: { id: reviewId } });
   await updateProductRatingCache(review.product_id);
 }
 
 async function adminDeleteReview(reviewId) {
-  const review = await db("reviews").where({ id: reviewId }).first();
+  const review = await prisma.reviews.findUnique({ where: { id: reviewId } });
   if (!review) {
     throw new ApiError(404, "Review not found", "NOT_FOUND");
   }
 
-  await db("reviews").where({ id: reviewId }).del();
+  await prisma.reviews.delete({ where: { id: reviewId } });
   await updateProductRatingCache(review.product_id);
 }
 
