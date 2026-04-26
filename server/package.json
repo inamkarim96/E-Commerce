@@ -12,9 +12,6 @@
     "migrate": "prisma migrate dev",
     "seed": "prisma db seed"
   },
-  "engines": {
-    "node": ">=18"
-  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@sendgrid/mail": "^8.1.4",
