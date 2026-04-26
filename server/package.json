@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "test": "jest",
     "build": "prisma generate",
+    "postinstall": "prisma generate",
     "migrate": "prisma migrate dev",
     "seed": "prisma db seed"
   },

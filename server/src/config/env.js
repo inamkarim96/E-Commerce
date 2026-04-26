@@ -27,7 +27,10 @@ const schema = Joi.object({
   STRIPE_WEBHOOK_SECRET: Joi.string().allow("").optional(),
   ADMIN_EMAIL: Joi.string().email().required(),
   ADMIN_PHONE: Joi.string().required(),
-  ADMIN_PASSWORD: Joi.string().required()
+  ADMIN_PASSWORD: Joi.string().required(),
+  FIREBASE_PROJECT_ID: Joi.string().optional(),
+  FIREBASE_CLIENT_EMAIL: Joi.string().optional(),
+  FIREBASE_PRIVATE_KEY: Joi.string().optional()
 })
   .unknown()
   .required();
@@ -64,7 +67,10 @@ const {
   STRIPE_WEBHOOK_SECRET,
   ADMIN_EMAIL,
   ADMIN_PHONE,
-  ADMIN_PASSWORD
+  ADMIN_PASSWORD,
+  FIREBASE_PROJECT_ID,
+  FIREBASE_CLIENT_EMAIL,
+  FIREBASE_PRIVATE_KEY
 } = value;
 
 module.exports = {
@@ -90,5 +96,8 @@ module.exports = {
   STRIPE_WEBHOOK_SECRET,
   ADMIN_EMAIL,
   ADMIN_PHONE,
-  ADMIN_PASSWORD
+  ADMIN_PASSWORD,
+  FIREBASE_PROJECT_ID,
+  FIREBASE_CLIENT_EMAIL,
+  FIREBASE_PRIVATE_KEY
 };

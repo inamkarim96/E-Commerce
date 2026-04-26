@@ -1,18 +1,32 @@
 const admin = require("firebase-admin");
 const path = require("path");
-const { NODE_ENV } = require("./env");
+const { 
+  NODE_ENV, 
+  FIREBASE_PROJECT_ID, 
+  FIREBASE_CLIENT_EMAIL, 
+  FIREBASE_PRIVATE_KEY 
+} = require("./env");
 
 let firebaseApp = null;
 
 try {
-  // We expect the serviceAccountKey.json to be in the same directory
-  // The user should download this from Firebase Console > Project Settings > Service Accounts
-  const serviceAccount = require("./serviceAccountKey.json");
+  let credential;
 
-  firebaseApp = admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
+  // Try using environment variables first (Production)
+  if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
+    credential = admin.credential.cert({
+      projectId: FIREBASE_PROJECT_ID,
+      clientEmail: FIREBASE_CLIENT_EMAIL,
+      // Handle Vercel private key newlines correctly
+      privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    });
+  } else {
+    // Fallback to JSON file (Local Development)
+    const serviceAccount = require("./serviceAccountKey.json");
+    credential = admin.credential.cert(serviceAccount);
+  }
 
+  firebaseApp = admin.initializeApp({ credential });
   console.log("Firebase Admin initialized successfully");
 } catch (error) {
   console.error("Firebase Admin initialization failed:", error.message);
