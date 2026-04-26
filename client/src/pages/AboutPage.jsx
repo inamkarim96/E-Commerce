@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Leaf, ShieldCheck, Heart, Award } from "lucide-react";
-import "../shared/AboutPage.css";
+import "../shared/aboutpage.css";
 
 const AboutPage = () => {
   const fadeInVariants = {

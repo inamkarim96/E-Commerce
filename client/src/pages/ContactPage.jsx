@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Phone, Mail, Send } from 'lucide-react';
-import '../shared/ContactPage.css';
+import '../shared/contactpage.css';
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({
