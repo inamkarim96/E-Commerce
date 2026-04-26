@@ -83,18 +83,31 @@ async function register(payload) {
   }
 
   const password_hash = await bcrypt.hash(payload.password, 12);
-  const { name, email } = payload;
+  const { name, email, phone, country, city, address } = payload;
   const [user] = await db("users")
     .insert({
       name,
       email,
       password_hash,
+      phone,
       role: 'customer',   // always hardcoded — never from req.body
       is_active: true,
       email_verified: false,
       failed_login_attempts: 0,
     })
     .returning("*");
+
+  if (address || city || country) {
+    await db("addresses").insert({
+      user_id: user.id,
+      full_name: name,
+      phone,
+      address_line: address,
+      city,
+      country: country || 'PK',
+      is_default: true
+    });
+  }
 
   const verificationToken = generateSixDigitCode();
   await redis.set(

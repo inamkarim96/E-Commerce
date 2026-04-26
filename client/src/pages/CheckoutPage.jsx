@@ -6,6 +6,7 @@ import { checkoutStyles } from '../shared/style';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import * as ordersApi from '../api/orders';
+import { getMyAddresses } from '../api/users';
 
 const CheckoutPage = () => {
   const [step, setStep] = useState(1);
@@ -33,6 +34,23 @@ const CheckoutPage = () => {
     zipCode: '',
     paymentMethod: 'cod',
   });
+
+  React.useEffect(() => {
+    if (user) {
+      getMyAddresses().then(res => {
+        if (res.success && res.data && res.data.length > 0) {
+          const defaultAddr = res.data.find(a => a.is_default) || res.data[0];
+          setFormData(prev => ({
+            ...prev,
+            address: prev.address || defaultAddr.address_line || '',
+            city: prev.city || defaultAddr.city || '',
+            country: prev.country || defaultAddr.country || 'Pakistan',
+            zipCode: prev.zipCode || defaultAddr.postal_code || ''
+          }));
+        }
+      }).catch(err => console.error("Failed to fetch address:", err));
+    }
+  }, [user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
