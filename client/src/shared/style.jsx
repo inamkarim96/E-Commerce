@@ -1384,6 +1384,26 @@ export const accountStyles = `
     box-shadow: var(--shadow-sm);
   }
 
+  .save-btn {
+    padding: 0.8rem 2rem;
+    border-radius: var(--radius-md);
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .save-btn:hover {
+    background: var(--primary-light);
+  }
+
+  .save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .orders-list {
     display: flex;
     flex-direction: column;
@@ -1418,6 +1438,19 @@ export const accountStyles = `
     }
     .account-content {
       padding: 2.5rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .account-page {
+      padding: 2rem 0 4rem;
+    }
+    .account-content {
+      padding: 1.5rem;
+    }
+    .user-brief {
+      flex-direction: column;
+      text-align: center;
     }
   }
 `;
@@ -1514,6 +1547,40 @@ export const adminLayoutStyles = `
     }
     .admin-main {
       margin-left: 80px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .admin-sidebar {
+      width: 60px;
+      padding-top: 1rem;
+    }
+    .admin-logo {
+      padding: 1rem;
+    }
+    .admin-nav {
+      padding: 0 0.5rem;
+    }
+    .admin-nav-item {
+      padding: 1rem;
+      justify-content: center;
+    }
+    .admin-main {
+      margin-left: 60px;
+    }
+    .admin-header {
+      padding: 0 1rem;
+      flex-direction: column;
+      height: auto;
+      gap: 1rem;
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+    .admin-search {
+      width: 100%;
+    }
+    .admin-content {
+      padding: 1.5rem;
     }
   }
 `;
@@ -1742,24 +1809,41 @@ export const loginStyles = `
     width: 100%;
   }
 
-  .form-group label {
+  .login-card .form-group label {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 600;
     font-size: 0.9rem;
   }
 
-  .input-wrapper {
+  .login-card .input-wrapper {
     position: relative;
     display: flex;
     align-items: center;
-  }
-
-  .input-wrapper input {
-    width: 100%;
-    padding: 1rem 1rem 1rem 3.5rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
+    background: white;
+    overflow: hidden;
+  }
+
+  .login-card .input-wrapper svg {
+    position: absolute;
+    left: 1rem;
+    color: var(--text-muted);
+    z-index: 2;
+  }
+
+  .login-card .input-wrapper input,
+  .login-card .input-wrapper input[type="text"],
+  .login-card .input-wrapper input[type="email"],
+  .login-card .input-wrapper input[type="password"],
+  .login-card .input-wrapper input[type="tel"] {
+    flex: 1;
+    width: 100%;
+    padding: 1rem 1rem 1rem 3rem;
+    border: none;
+    outline: none;
+    background: transparent;
   }
 
   .submit-btn {
@@ -1770,6 +1854,21 @@ export const loginStyles = `
     font-weight: 700;
     width: 100%;
     margin-top: 1rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  @media (max-width: 640px) {
+    .login-card {
+      padding: 2rem 1.5rem;
+    }
+    .form-row {
+      grid-template-columns: 1fr;
+    }
   }
 `;
 
@@ -2455,7 +2554,7 @@ export const adminManagementStyles = `
     background: white;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
-    overflow: hidden;
+    overflow-x: auto;
   }
 
   .admin-table {
@@ -2625,6 +2724,7 @@ export const adminManagementStyles = `
     .form-row { grid-template-columns: 1fr; }
     .page-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
     .toolbar { flex-direction: column; align-items: stretch; }
+    .admin-table th, .admin-table td { padding: 1rem; }
   }
 `;
 

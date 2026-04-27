@@ -88,9 +88,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const firebaseLogin = async (idToken) => {
+  const firebaseLogin = async (idToken, profileData) => {
     try {
-      const response = await authApi.firebaseLogin(idToken);
+      const response = await authApi.firebaseLogin(idToken, profileData);
       if (response.success) {
         const { user: userData, accessToken } = response.data;
         // Firebase login now requires verification too — return status

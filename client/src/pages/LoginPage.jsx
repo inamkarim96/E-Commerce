@@ -145,7 +145,7 @@ const LoginPage = () => {
   const [countries, setCountries] = useState([]);
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', email: '', password: '',
-    rePassword: '', phoneCode: '+92', phone: '', country: 'Pakistan', city: '', address: ''
+    rePassword: '', phoneCode: '+92', phone: '', country: '', city: '', address: ''
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -187,11 +187,11 @@ const LoginPage = () => {
           await user.reload();
           // Force refresh token to get latest claims
           const idTokenResult = await user.getIdTokenResult(true);
-          
+
           if (user.emailVerified || idTokenResult.claims.email_verified) {
             clearInterval(pollInterval.current);
             setVerificationEmail('Finalizing your secure session...');
-            
+
             const idToken = await user.getIdToken(true);
             await finalizeLogin(idToken);
             // Redirection is now handled by the useEffect above
@@ -270,6 +270,13 @@ const LoginPage = () => {
         }
       } else {
         // Registration Logic
+        const requiredFields = ['firstName', 'lastName', 'email', 'password', 'rePassword', 'phone', 'country', 'city', 'address'];
+        const missingFields = requiredFields.filter(field => !formData[field].trim());
+
+        if (missingFields.length > 0) {
+          throw new Error('Please fill in all required fields to create your account.');
+        }
+
         if (formData.password !== formData.rePassword) {
           throw new Error('Passwords do not match');
         }
@@ -450,19 +457,19 @@ const LoginPage = () => {
                 </div>
               )}
               {!isLogin && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-row">
                   <div className="form-group">
                     <label>First Name</label>
                     <div className="input-wrapper">
                       <User size={18} />
-                      <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="John" required />
+                      <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="first" required />
                     </div>
                   </div>
                   <div className="form-group">
                     <label>Last Name</label>
                     <div className="input-wrapper">
                       <User size={18} />
-                      <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Doe" required />
+                      <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="last" required />
                     </div>
                   </div>
                 </div>
@@ -478,8 +485,8 @@ const LoginPage = () => {
                       onChange={(val) => handleChange({ target: { name: 'phoneCode', value: val } })}
                       hideSelectedLabel={true}
                     />
-                    <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', margin: '0 0.5rem' }}></div>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="300 1234567" required />
+                    <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 0.5rem' }}></div>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="300 1234567" required style={{ paddingLeft: '1rem' }} />
                   </div>
                 </div>
               )}
@@ -494,8 +501,8 @@ const LoginPage = () => {
                       onChange={(val) => handleChange({ target: { name: 'phoneCode', value: val } })}
                       hideSelectedLabel={true}
                     />
-                    <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', margin: '0 0.5rem' }}></div>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder={phonePlaceholder} required />
+                    <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 0.5rem' }}></div>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder={phonePlaceholder} required style={{ paddingLeft: '1rem' }} />
                   </div>
                 </div>
               ) : (
@@ -519,7 +526,7 @@ const LoginPage = () => {
 
               {!isLogin && (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-row">
                     <div className="form-group">
                       <label>Country</label>
                       <div className="input-wrapper">
@@ -536,7 +543,7 @@ const LoginPage = () => {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>Shipping Address</label>
+                    <label>Home Address</label>
                     <div className="input-wrapper">
                       <MapPin size={18} />
                       <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="123 Street Name" required />

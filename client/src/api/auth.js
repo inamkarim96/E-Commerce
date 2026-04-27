@@ -29,8 +29,8 @@ export const verifyEmail = async (token) => {
   return response.data;
 };
 
-export const firebaseLogin = async (idToken) => {
-  const response = await api.post('/auth/firebase-login', { idToken });
+export const firebaseLogin = async (idToken, profileData) => {
+  const response = await api.post('/auth/firebase-login', { idToken, profileData });
   return response.data;
 };
 

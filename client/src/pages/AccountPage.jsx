@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { accountStyles } from '../shared/style';
 import { getMyOrders, getOrderById } from '../api/orders';
+import { getMyAddresses, addAddress, updateAddress, deleteAddress } from '../api/users';
 
 const AccountPage = () => {
   const { user, logout, updateProfile } = useAuth();
@@ -21,6 +22,14 @@ const AccountPage = () => {
   });
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+
+  const [addresses, setAddresses] = useState(user?.addresses || []);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [addressForm, setAddressForm] = useState({
+    full_name: '', phone: '', address_line: '', city: '', country: 'Pakistan', is_default: false
+  });
 
   const splitName = (fullName) => {
     const parts = (fullName || '').trim().split(/\s+/);
@@ -78,6 +87,22 @@ const AccountPage = () => {
     fetchOrders();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== 'address') return;
+    const fetchAddresses = async () => {
+      try {
+        setAddressesLoading(true);
+        const res = await getMyAddresses();
+        if (res.success) setAddresses(res.data);
+      } catch (err) {
+        console.error('Failed to load addresses:', err);
+      } finally {
+        setAddressesLoading(false);
+      }
+    };
+    fetchAddresses();
+  }, [activeTab]);
+
   const handleProfileSave = async () => {
     try {
       setProfileSaving(true);
@@ -103,6 +128,38 @@ const AccountPage = () => {
       console.error('Failed to load order details:', err);
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const handleAddressSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingAddress) {
+        const res = await updateAddress(editingAddress.id, addressForm);
+        if (res.success) {
+          setAddresses(addresses.map(a => a.id === editingAddress.id ? res.data : a));
+        }
+      } else {
+        const res = await addAddress(addressForm);
+        if (res.success) {
+          setAddresses([...addresses, res.data]);
+        }
+      }
+      setShowAddressForm(false);
+      setEditingAddress(null);
+    } catch (err) {
+      console.error('Failed to save address:', err);
+      alert('Failed to save address');
+    }
+  };
+
+  const handleDeleteAddress = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this address?')) return;
+    try {
+      await deleteAddress(id);
+      setAddresses(addresses.filter(a => a.id !== id));
+    } catch (err) {
+      console.error('Failed to delete address:', err);
     }
   };
 
@@ -285,28 +342,85 @@ const AccountPage = () => {
             {/* ── Address Tab ── */}
             {activeTab === 'address' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="tab-pane">
-                <div className="tab-header">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                   <h2>Saved Addresses</h2>
-                  <button className="add-btn">+ Add New</button>
-                </div>
-                <div className="address-grid">
-                  {user.addresses && user.addresses.length > 0 ? (
-                    user.addresses.map((addr) => (
-                      <div key={addr.id} className={`address-card ${addr.is_default ? 'active' : ''}`}>
-                        {addr.is_default && <div className="addr-tag">Default</div>}
-                        <h3>{addr.full_name || 'Home'}</h3>
-                        <p>{addr.address_line}</p>
-                        <p>{addr.city}, {addr.province || ''} {addr.postal_code || ''}</p>
-                        <p>{addr.country}</p>
-                        <div className="addr-actions">
-                          <button onClick={() => setActiveTab('profile')}>View in Profile</button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p style={{ color: '#64748b' }}>No saved addresses found.</p>
+                  {!showAddressForm && (
+                    <button className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }} onClick={() => {
+                      setEditingAddress(null);
+                      setAddressForm({ full_name: user?.name || '', phone: user?.phone || '', address_line: '', city: '', country: 'Pakistan', is_default: false });
+                      setShowAddressForm(true);
+                    }}>
+                      Add New Address
+                    </button>
                   )}
                 </div>
+
+                {showAddressForm ? (
+                  <div className="address-form" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h3 style={{ marginBottom: '1.5rem' }}>{editingAddress ? 'Edit Address' : 'Add New Address'}</h3>
+                    <form onSubmit={handleAddressSubmit}>
+                      <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div className="form-group">
+                          <label>Full Name</label>
+                          <input type="text" required value={addressForm.full_name} onChange={e => setAddressForm({...addressForm, full_name: e.target.value})} style={{ width: '100%', padding: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                        </div>
+                        <div className="form-group">
+                          <label>Phone Number</label>
+                          <input type="text" required value={addressForm.phone} onChange={e => setAddressForm({...addressForm, phone: e.target.value})} style={{ width: '100%', padding: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: '1rem' }}>
+                        <label>Address Line</label>
+                        <input type="text" required value={addressForm.address_line} onChange={e => setAddressForm({...addressForm, address_line: e.target.value})} style={{ width: '100%', padding: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                      </div>
+                      <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div className="form-group">
+                          <label>City</label>
+                          <input type="text" required value={addressForm.city} onChange={e => setAddressForm({...addressForm, city: e.target.value})} style={{ width: '100%', padding: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                        </div>
+                        <div className="form-group">
+                          <label>Country</label>
+                          <input type="text" required value={addressForm.country} onChange={e => setAddressForm({...addressForm, country: e.target.value})} style={{ width: '100%', padding: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input type="checkbox" id="is_default" checked={addressForm.is_default} onChange={e => setAddressForm({...addressForm, is_default: e.target.checked})} />
+                        <label htmlFor="is_default" style={{ margin: 0 }}>Set as Default Address</label>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                        <button type="button" onClick={() => setShowAddressForm(false)} style={{ padding: '0.8rem 1.5rem', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+                        <button type="submit" className="save-btn" style={{ margin: 0, width: 'auto' }}>Save Address</button>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="address-grid">
+                    {addressesLoading ? (
+                      <p style={{ color: 'var(--text-muted)' }}>Loading addresses...</p>
+                    ) : addresses.length > 0 ? (
+                      addresses.map((addr) => (
+                        <div key={addr.id} className={`address-card ${addr.is_default ? 'default' : ''}`}>
+                          {addr.is_default && <span className="default-badge">Default</span>}
+                          <h3>{addr.full_name}</h3>
+                          <p>{addr.phone}</p>
+                          <p>{addr.address_line}</p>
+                          <p>{addr.city}</p>
+                          <p>{addr.country}</p>
+                          <div className="addr-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                            <button onClick={() => {
+                              setEditingAddress(addr);
+                              setAddressForm({ full_name: addr.full_name || '', phone: addr.phone || '', address_line: addr.address_line || '', city: addr.city || '', country: addr.country || 'Pakistan', is_default: addr.is_default || false });
+                              setShowAddressForm(true);
+                            }} style={{ padding: '0.5rem 1rem', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', flex: 1 }}>Edit</button>
+                            <button onClick={() => handleDeleteAddress(addr.id)} style={{ padding: '0.5rem 1rem', background: '#fee2e2', color: '#b91c1c', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', flex: 1 }}>Delete</button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ color: '#64748b' }}>No saved addresses found.</p>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
 
