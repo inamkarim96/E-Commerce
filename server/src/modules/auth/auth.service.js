@@ -112,7 +112,10 @@ async function login(payload) {
       throw new ApiError(401, "Invalid admin credentials", "INVALID_CREDENTIALS");
     }
 
-    let user = await prisma.users.findUnique({ where: { email: ADMIN_EMAIL } });
+    let user = await prisma.users.findUnique({ 
+      where: { email: ADMIN_EMAIL },
+      include: { addresses: { where: { is_default: true } } }
+    });
 
     if (!user) {
       // Create Admin in local DB
@@ -126,6 +129,12 @@ async function login(payload) {
           email_verified: false,
           failed_login_attempts: 0
         }
+      });
+    } else if (user.role !== 'admin') {
+      // Sync role if it was changed
+      user = await prisma.users.update({
+        where: { id: user.id },
+        data: { role: 'admin', updated_at: new Date() }
       });
     }
 
@@ -165,7 +174,8 @@ async function login(payload) {
   }
 
   const user = await prisma.users.findUnique({
-    where: { email: payload.email }
+    where: { email: payload.email },
+    include: { addresses: { where: { is_default: true } } }
   });
   if (!user) {
     throw new ApiError(401, "Invalid email or password", "INVALID_CREDENTIALS");
@@ -290,7 +300,11 @@ async function refresh(refreshToken) {
       is_active: true,
       email_verified: true,
       created_at: true,
-      updated_at: true
+      updated_at: true,
+      addresses: {
+        where: { is_default: true },
+        take: 1
+      }
     }
   });
 
@@ -422,12 +436,14 @@ async function firebaseLogin(idToken, profileData = null) {
 
   // Find or create user in local DB
   let user = await prisma.users.findUnique({
-    where: { firebase_uid: uid }
+    where: { firebase_uid: uid },
+    include: { addresses: { where: { is_default: true } } }
   });
 
   if (!user && email) {
     user = await prisma.users.findUnique({
-      where: { email }
+      where: { email },
+      include: { addresses: { where: { is_default: true } } }
     });
   }
 
@@ -527,12 +543,42 @@ async function finalizeLoginAfterVerification(idToken) {
     throw new ApiError(401, "Email is not verified yet", "EMAIL_NOT_VERIFIED");
   }
 
-  const user = await prisma.users.findUnique({
-    where: { firebase_uid: decodedToken.uid }
+  let user = await prisma.users.findUnique({
+    where: { firebase_uid: decodedToken.uid },
+    include: { addresses: { where: { is_default: true } } }
   });
+
+  if (!user && decodedToken.email) {
+    user = await prisma.users.findUnique({
+      where: { email: decodedToken.email },
+      include: { addresses: { where: { is_default: true } } }
+    });
+  }
 
   if (!user) {
     throw new ApiError(404, "User not found", "USER_NOT_FOUND");
+  }
+
+  // Ensure firebase_uid is synced if we found by email
+  if (!user.firebase_uid) {
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { firebase_uid: decodedToken.uid }
+    });
+  }
+
+  if (user.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim() && user.role !== 'admin') {
+    const updatedUser = await prisma.users.update({
+      where: { id: user.id },
+      data: { role: 'admin', updated_at: new Date() },
+      include: { addresses: { where: { is_default: true } } }
+    });
+    
+    const cleanUser = sanitizeUser(updatedUser);
+    const accessToken = createAccessToken(cleanUser);
+    const refreshToken = createRefreshToken(cleanUser);
+    
+    return { user: cleanUser, accessToken, refreshToken };
   }
 
   const cleanUser = sanitizeUser(user);

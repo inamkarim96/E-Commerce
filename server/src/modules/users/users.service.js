@@ -14,12 +14,26 @@ async function getProfile(userId) {
       role: true,
       email_verified: true,
       is_active: true,
-      created_at: true
+      created_at: true,
+      addresses: {
+        where: { is_default: true },
+        take: 1
+      }
     }
   });
 
   if (!user) {
     throw new ApiError(404, "User not found", "USER_NOT_FOUND");
+  }
+
+  // Admin Role Sync Fallback
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+  if (user.email.toLowerCase().trim() === adminEmail && user.role !== "admin") {
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { role: "admin" }
+    });
+    user.role = "admin";
   }
 
   return user;

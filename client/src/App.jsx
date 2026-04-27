@@ -64,6 +64,9 @@ function App() {
           <Route path="users" element={<AdminUsers />} />
         </Route>
 
+        {/* Redirects */}
+        <Route path="/AdminDashboard" element={<Navigate to="/admin" replace />} />
+
         {/* 404 */}
         <Route path="*" element={<MainLayout><div>404 Not Found</div></MainLayout>} />
       </Routes>

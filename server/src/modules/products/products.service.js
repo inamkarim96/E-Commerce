@@ -21,20 +21,6 @@ async function ensureUniqueSlug(name, excludeId = null) {
   throw new ApiError(500, "Unable to generate product slug", "SLUG_GENERATION_FAILED");
 }
 
-async function fetchVariantsByProductIds(productIds, trx = db) {
-  if (!productIds.length) return {};
-
-  const rows = await trx("weight_variants")
-    .whereIn("product_id", productIds)
-    .select("id", "product_id", "label", "weight_grams", "price", "stock")
-    .orderBy("weight_grams", "asc");
-
-  return rows.reduce((acc, row) => {
-    if (!acc[row.product_id]) acc[row.product_id] = [];
-    acc[row.product_id].push(row);
-    return acc;
-  }, {});
-}
 
 async function fetchReviewStatsByProductIds(productIds) {
   if (!productIds.length) return {};
@@ -66,19 +52,6 @@ function mapProduct(row, reviewMap) {
   };
 }
 
-function applyListFilters(query, filters) {
-  query.where("p.is_active", true);
-
-  if (filters.category) {
-    query.andWhere("c.slug", filters.category);
-  }
-  if (filters.min_price !== undefined) {
-    query.andWhere("p.base_price", ">=", filters.min_price);
-  }
-  if (filters.max_price !== undefined) {
-    query.andWhere("p.base_price", "<=", filters.max_price);
-  }
-}
 
 async function listProducts(filters) {
   const page = Number(filters.page || 1);

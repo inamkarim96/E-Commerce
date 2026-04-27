@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Package, MapPin, Key, LogOut, ExternalLink, Grid, Box, ShoppingBag, Users, X } from 'lucide-react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { accountStyles } from '../shared/style';
@@ -9,11 +9,32 @@ import { getMyOrders, getOrderById } from '../api/orders';
 const AccountPage = () => {
   const { user, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isAdmin = user?.role === 'admin';
-  const [activeTab, setActiveTab] = useState('profile');
+  
+  // Set active tab based on URL path
+  const [activeTab, setActiveTab] = useState(() => {
+    const path = location.pathname;
+    if (path.includes('orders')) return 'orders';
+    if (path.includes('address')) return 'address';
+    return 'profile';
+  });
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: user?.name || '', phone: user?.phone || '' });
+
+  const splitName = (fullName) => {
+    const parts = (fullName || '').trim().split(/\s+/);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+    return { firstName, lastName };
+  };
+
+  const { firstName: initFirst, lastName: initLast } = splitName(user?.name);
+  const [profileForm, setProfileForm] = useState({
+    firstName: initFirst,
+    lastName: initLast,
+    phone: user?.phone || ''
+  });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
@@ -29,9 +50,11 @@ const AccountPage = () => {
   // Sync profile form when user data loads
   useEffect(() => {
     if (user) {
-      setProfileForm({ 
-        name: user.name || '', 
-        phone: user.phone || '' 
+      const { firstName, lastName } = splitName(user.name);
+      setProfileForm({
+        firstName,
+        lastName,
+        phone: user.phone || ''
       });
     }
   }, [user]);
@@ -59,7 +82,8 @@ const AccountPage = () => {
     try {
       setProfileSaving(true);
       setProfileMsg(null);
-      await updateProfile(profileForm);
+      const fullName = `${profileForm.firstName} ${profileForm.lastName}`.trim();
+      await updateProfile({ name: fullName, phone: profileForm.phone });
       setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
     } catch (err) {
       setProfileMsg({ type: 'error', text: 'Failed to update profile.' });
@@ -136,7 +160,7 @@ const AccountPage = () => {
               <button className={activeTab === 'password' ? 'active' : ''} onClick={() => setActiveTab('password')}>
                 <Key size={20} /> Change Password
               </button>
-              
+
               <button className="logout-btn" onClick={logout}>
                 <LogOut size={20} /> Logout
               </button>
@@ -164,21 +188,29 @@ const AccountPage = () => {
                   </div>
                 )}
                 <div className="profile-form">
-                  <div className="form-row">
+                  <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                     <div className="form-group">
-                      <label>Full Name</label>
+                      <label>First Name</label>
                       <input
                         type="text"
-                        value={profileForm.name}
-                        onChange={(e) => setProfileForm((p) => ({ ...p, name: e.target.value }))}
+                        value={profileForm.firstName}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, firstName: e.target.value }))}
                       />
                     </div>
                     <div className="form-group">
-                      <label>Email Address</label>
-                      <input type="email" defaultValue={user.email} disabled />
+                      <label>Last Name</label>
+                      <input
+                        type="text"
+                        value={profileForm.lastName}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, lastName: e.target.value }))}
+                      />
                     </div>
                   </div>
-                  <div className="form-row">
+                  <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                    <div className="form-group">
+                      <label>Email Address</label>
+                      <input type="email" value={user.email} disabled style={{ backgroundColor: '#f8fafc', color: '#64748b' }} />
+                    </div>
                     <div className="form-group">
                       <label>Phone Number</label>
                       <input
@@ -189,6 +221,17 @@ const AccountPage = () => {
                       />
                     </div>
                   </div>
+
+                  {user.addresses && user.addresses.length > 0 && (
+                    <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                      <label>Default Address</label>
+                      <div style={{ padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
+                        <p style={{ margin: 0, fontSize: '0.95rem', color: '#475569' }}>
+                          {user.addresses[0].address_line}, {user.addresses[0].city}, {user.addresses[0].country}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   <button className="save-btn" onClick={handleProfileSave} disabled={profileSaving}>
                     {profileSaving ? 'Saving...' : 'Update Profile'}
                   </button>
@@ -247,16 +290,22 @@ const AccountPage = () => {
                   <button className="add-btn">+ Add New</button>
                 </div>
                 <div className="address-grid">
-                  <div className="address-card active">
-                    <div className="addr-tag">Default</div>
-                    <h3>Home</h3>
-                    <p>123 Nature St, Apartment 4B</p>
-                    <p>Karachi, Pakistan</p>
-                    <div className="addr-actions">
-                      <button>Edit</button>
-                      <button>Remove</button>
-                    </div>
-                  </div>
+                  {user.addresses && user.addresses.length > 0 ? (
+                    user.addresses.map((addr) => (
+                      <div key={addr.id} className={`address-card ${addr.is_default ? 'active' : ''}`}>
+                        {addr.is_default && <div className="addr-tag">Default</div>}
+                        <h3>{addr.full_name || 'Home'}</h3>
+                        <p>{addr.address_line}</p>
+                        <p>{addr.city}, {addr.province || ''} {addr.postal_code || ''}</p>
+                        <p>{addr.country}</p>
+                        <div className="addr-actions">
+                          <button onClick={() => setActiveTab('profile')}>View in Profile</button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ color: '#64748b' }}>No saved addresses found.</p>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -290,15 +339,15 @@ const AccountPage = () => {
       {selectedOrderDetails && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div className="modal-content" style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-            <button 
-              onClick={() => setSelectedOrderDetails(null)} 
+            <button
+              onClick={() => setSelectedOrderDetails(null)}
               style={{ position: 'absolute', right: '1.5rem', top: '1.5rem', border: 'none', background: 'transparent', cursor: 'pointer', color: '#666' }}
             >
               <X size={24} />
             </button>
-            
+
             <h2 style={{ marginBottom: '1.5rem' }}>Order Details</h2>
-            
+
             <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ color: '#64748b' }}>Order ID:</span>
@@ -353,7 +402,7 @@ const AccountPage = () => {
             <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
               <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Shipping Address</h4>
               <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
-                {typeof selectedOrderDetails.shipping_address === 'object' 
+                {typeof selectedOrderDetails.shipping_address === 'object'
                   ? `${selectedOrderDetails.shipping_address.address}, ${selectedOrderDetails.shipping_address.city}, ${selectedOrderDetails.shipping_address.zip_code}, ${selectedOrderDetails.shipping_address.country}`
                   : selectedOrderDetails.shipping_address}
               </p>

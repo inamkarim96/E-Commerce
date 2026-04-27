@@ -37,11 +37,16 @@ async function login(req, res) {
   }
 
   const result = await authService.login(value);
-  setRefreshCookie(res, result.refreshToken);
+  if (result.refreshToken) {
+    setRefreshCookie(res, result.refreshToken);
+  }
 
   return sendSuccess(res, {
     accessToken: result.accessToken,
-    user: result.user
+    user: result.user,
+    status: result.status,
+    email: result.email,
+    customToken: result.customToken
   });
 }
 

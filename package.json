@@ -7,7 +7,8 @@
     "server"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w client\" \"npm run dev -w server\""
+    "dev": "concurrently \"npm run dev -w client\" \"npm run dev -w server\"",
+    "clean": "rimraf client/dist server/dist client/node_modules server/node_modules node_modules package-lock.json client/package-lock.json server/package-lock.json"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

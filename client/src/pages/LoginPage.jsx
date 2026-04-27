@@ -4,8 +4,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, ArrowRight, Phone, MapPin, Home, Key } from 'lucide-react';
 import { loginStyles } from '../shared/style';
-import { 
-  signInWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPhoneNumber,
   signInWithCustomToken,
@@ -51,11 +51,11 @@ const CustomSelect = ({ options, value, onChange, placeholder, style, hideSelect
 
   return (
     <div ref={ref} style={{ position: 'relative', height: '100%', ...style }}>
-      <div 
+      <div
         onClick={() => setIsOpen(!isOpen)}
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        style={{
+          display: 'flex',
+          alignItems: 'center',
           height: '100%',
           cursor: 'pointer',
           padding: '0 0.5rem',
@@ -64,13 +64,13 @@ const CustomSelect = ({ options, value, onChange, placeholder, style, hideSelect
         }}
       >
         {selectedOption ? (
-           <>
-             <span className={`fi fi-${selectedOption.cca2.toLowerCase()}`} style={{ fontSize: '20px', borderRadius: '2px' }} />
-             {!hideSelectedLabel && <span>{selectedOption.label}</span>}
-           </>
+          <>
+            <span className={`fi fi-${selectedOption.cca2.toLowerCase()}`} style={{ fontSize: '20px', borderRadius: '2px' }} />
+            {!hideSelectedLabel && <span>{selectedOption.label}</span>}
+          </>
         ) : placeholder}
       </div>
-      
+
       {isOpen && (
         <div style={{
           position: 'absolute',
@@ -88,10 +88,10 @@ const CustomSelect = ({ options, value, onChange, placeholder, style, hideSelect
           flexDirection: 'column'
         }}>
           <div style={{ padding: '0.5rem', position: 'sticky', top: 0, background: 'white', borderBottom: '1px solid #e2e8f0', zIndex: 10 }}>
-            <input 
+            <input
               ref={inputRef}
-              type="text" 
-              placeholder="Search..." 
+              type="text"
+              placeholder="Search..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
@@ -110,27 +110,27 @@ const CustomSelect = ({ options, value, onChange, placeholder, style, hideSelect
             <div style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.9rem' }}>No results found</div>
           ) : (
             filteredOptions.map(opt => (
-              <div 
+              <div
                 key={opt.cca2 + opt.value}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-              style={{
-                padding: '0.75rem 1rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                color: '#0f172a',
-                fontSize: '0.9rem'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              <span className={`fi fi-${opt.cca2.toLowerCase()}`} style={{ fontSize: '18px', borderRadius: '2px' }} />
-              <span style={{ whiteSpace: 'nowrap' }}>{opt.label}</span>
-            </div>
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                style={{
+                  padding: '0.75rem 1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  color: '#0f172a',
+                  fontSize: '0.9rem'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <span className={`fi fi-${opt.cca2.toLowerCase()}`} style={{ fontSize: '18px', borderRadius: '2px' }} />
+                <span style={{ whiteSpace: 'nowrap' }}>{opt.label}</span>
+              </div>
             ))
           )}
         </div>
@@ -143,15 +143,15 @@ const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loginMethod, setLoginMethod] = useState('email'); // 'email' or 'phone'
   const [countries, setCountries] = useState([]);
-  const [formData, setFormData] = useState({ 
-    firstName: '', lastName: '', email: '', password: '', 
-    rePassword: '', phoneCode: '+92', phone: '', country: 'Pakistan', city: '', address: '' 
+  const [formData, setFormData] = useState({
+    firstName: '', lastName: '', email: '', password: '',
+    rePassword: '', phoneCode: '+92', phone: '', country: 'Pakistan', city: '', address: ''
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [otp, setOtp] = useState('');
-  
+
   const { user, firebaseLogin, login, finalizeLogin } = useAuth();
   const navigate = useNavigate();
   const recaptchaRef = useRef(null);
@@ -160,11 +160,15 @@ const LoginPage = () => {
   const pollInterval = useRef(null);
 
   useEffect(() => {
-    if (user) {
-      if (user.role === 'admin') navigate('/admin', { replace: true });
-      else navigate('/', { replace: true });
+    if (user && !loading) {
+      const role = user.role || user.user?.role;
+      if (role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/account', { replace: true });
+      }
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     return () => {
@@ -175,21 +179,22 @@ const LoginPage = () => {
   const startVerificationPolling = (email) => {
     setIsVerifyingEmail(true);
     setVerificationEmail(email);
-    
+
     pollInterval.current = setInterval(async () => {
       try {
         const user = auth.currentUser;
         if (user) {
           await user.reload();
-          if (user.emailVerified) {
+          // Force refresh token to get latest claims
+          const idTokenResult = await user.getIdTokenResult(true);
+          
+          if (user.emailVerified || idTokenResult.claims.email_verified) {
             clearInterval(pollInterval.current);
+            setVerificationEmail('Finalizing your secure session...');
+            
             const idToken = await user.getIdToken(true);
-            const result = await finalizeLogin(idToken);
-            if (result?.user?.role === 'admin') {
-              navigate('/admin', { replace: true });
-            } else {
-              navigate('/', { replace: true });
-            }
+            await finalizeLogin(idToken);
+            // Redirection is now handled by the useEffect above
           }
         }
       } catch (err) {
@@ -231,11 +236,7 @@ const LoginPage = () => {
       startVerificationPolling(result.email);
       return;
     }
-    if (result?.user?.role === 'admin') {
-      navigate('/admin', { replace: true });
-    } else {
-      navigate('/', { replace: true });
-    }
+    // Redirection is handled by useEffect
   };
 
   const handleSubmit = async (e) => {
@@ -253,11 +254,8 @@ const LoginPage = () => {
               const userCredential = await signInWithCustomToken(auth, result.customToken);
               await sendEmailVerification(userCredential.user);
               startVerificationPolling(result.email);
-            } else if (result?.user?.role === 'admin') {
-              navigate('/admin', { replace: true });
-            } else {
-              navigate('/', { replace: true });
             }
+            // Redirection is handled by useEffect
           } else {
             const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
             await handleFirebaseSync(userCredential.user);
@@ -278,7 +276,7 @@ const LoginPage = () => {
 
         try {
           const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-          
+
           // Set display name in Firebase
           const fullName = `${formData.firstName} ${formData.lastName}`.trim();
           await updateProfile(userCredential.user, { displayName: fullName });
@@ -327,7 +325,7 @@ const LoginPage = () => {
       try {
         const example = getExampleNumber(selectedPhoneCountry.cca2, examples);
         if (example) return example.formatNational().replace(/^0/, '');
-      } catch (err) {}
+      } catch (err) { }
     }
     return "300 1234567";
   }, [selectedPhoneCountry]);
@@ -347,15 +345,15 @@ const LoginPage = () => {
         >
           <div className="card-header">
             <h1>{(confirmationResult || isVerifyingEmail) ? 'Verify Your Identity' : isLogin ? 'Welcome Back' : 'Create Account'}</h1>
-          <p>
-            {isVerifyingEmail
-              ? `We've sent a verification link to ${verificationEmail}. Please click it to continue.`
-              : confirmationResult
-              ? `Enter the code sent to your phone`
-              : isLogin
-              ? 'Sign in to continue your healthy journey'
-              : 'Join our community of natural food lovers'}
-          </p>
+            <p>
+              {isVerifyingEmail
+                ? `We've sent a verification link to ${verificationEmail}. Please click it to continue.`
+                : confirmationResult
+                  ? `Enter the code sent to your phone`
+                  : isLogin
+                    ? 'Sign in to continue your healthy journey'
+                    : 'Join our community of natural food lovers'}
+            </p>
           </div>
 
           <div id="recaptcha-container"></div>
@@ -397,13 +395,13 @@ const LoginPage = () => {
           ) : isVerifyingEmail ? (
             <div className="login-form" style={{ textAlign: 'center' }}>
               <div style={{ marginBottom: '2rem' }}>
-                <div style={{ 
-                  width: '60px', 
-                  height: '60px', 
-                  borderRadius: '50%', 
-                  background: '#f0fdf4', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  background: '#f0fdf4',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto 1.5rem'
                 }}>
@@ -413,10 +411,10 @@ const LoginPage = () => {
                   Waiting for you to click the link in your email...
                 </p>
               </div>
-              
-              <button 
-                type="button" 
-                className="submit-btn" 
+
+              <button
+                type="button"
+                className="submit-btn"
                 onClick={handleResendEmail}
                 style={{ background: '#f9fafb', color: '#374151', border: '1px solid #e5e7eb' }}
               >
@@ -435,14 +433,14 @@ const LoginPage = () => {
             <form onSubmit={handleSubmit} className="login-form">
               {isLogin && (
                 <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setLoginMethod('email')}
                     style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', background: loginMethod === 'email' ? 'white' : 'transparent', fontWeight: loginMethod === 'email' ? '600' : '400', boxShadow: loginMethod === 'email' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}
                   >
                     Email
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setLoginMethod('phone')}
                     style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', background: loginMethod === 'phone' ? 'white' : 'transparent', fontWeight: loginMethod === 'phone' ? '600' : '400', boxShadow: loginMethod === 'phone' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}
@@ -474,7 +472,7 @@ const LoginPage = () => {
                 <div className="form-group">
                   <label>Phone Number</label>
                   <div className="input-wrapper" style={{ paddingLeft: '0.5rem' }}>
-                    <CustomSelect 
+                    <CustomSelect
                       options={countries.map(c => ({ value: c.code, label: c.code, cca2: c.cca2, searchKey: `${c.name} ${c.code}` }))}
                       value={formData.phoneCode}
                       onChange={(val) => handleChange({ target: { name: 'phoneCode', value: val } })}
@@ -490,7 +488,7 @@ const LoginPage = () => {
                 <div className="form-group">
                   <label>Phone Number</label>
                   <div className="input-wrapper" style={{ paddingLeft: '0.5rem' }}>
-                    <CustomSelect 
+                    <CustomSelect
                       options={countries.map(c => ({ value: c.code, label: c.code, cca2: c.cca2, searchKey: `${c.name} ${c.code}` }))}
                       value={formData.phoneCode}
                       onChange={(val) => handleChange({ target: { name: 'phoneCode', value: val } })}

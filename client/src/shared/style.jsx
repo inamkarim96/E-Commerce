@@ -1520,6 +1520,34 @@ export const adminLayoutStyles = `
 
 /* Admin Dashboard Styles */
 export const adminDashboardStyles = `
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .dashboard-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-main);
+  }
+
+  .download-btn {
+    padding: 0.75rem 1.5rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .download-btn:hover {
+    background: #f8fafc;
+    border-color: var(--primary);
+  }
+
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -1534,17 +1562,32 @@ export const adminDashboardStyles = `
     box-shadow: var(--shadow-sm);
     display: flex;
     gap: 1.5rem;
+    align-items: center;
   }
 
   .stat-icon {
-    width: 50px;
-    height: 50px;
+    width: 54px;
+    height: 54px;
     background: rgba(45, 90, 39, 0.1);
     color: var(--primary);
-    border-radius: var(--radius-md);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .stat-details span {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-light);
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-details h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-main);
   }
 
   .dashboard-grid {
@@ -1560,6 +1603,26 @@ export const adminDashboardStyles = `
     box-shadow: var(--shadow-sm);
   }
 
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+
+  .panel-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+
+  .text-btn {
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-decoration: none;
+  }
+
   .admin-table {
     width: 100%;
     border-collapse: collapse;
@@ -1572,16 +1635,70 @@ export const adminDashboardStyles = `
     color: #64748b;
     font-size: 0.85rem;
     text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
   }
 
-  .status-pill.delivered {
-    background: #ecfdf5;
-    color: #059669;
+  .admin-table td {
+    padding: 1.25rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.95rem;
   }
 
-  .status-pill.processing {
-    background: #fffbeb;
-    color: #d97706;
+  .status-pill {
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .status-pill.delivered { background: #ecfdf5; color: #059669; }
+  .status-pill.processing { background: #eff6ff; color: #2563eb; }
+  .status-pill.pending { background: #fffbeb; color: #d97706; }
+  .status-pill.shipped { background: #f5f3ff; color: #7c3aed; }
+  .status-pill.cancelled { background: #fef2f2; color: #dc2626; }
+
+  .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .alert-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .alert-info strong {
+    display: block;
+    color: var(--text-main);
+    margin-bottom: 0.25rem;
+  }
+
+  .alert-info span {
+    font-size: 0.875rem;
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  .restock-btn {
+    padding: 0.5rem 1rem;
+    background: #f8fafc;
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: var(--transition);
+  }
+
+  .restock-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
   }
 
   @media (max-width: 1200px) {
@@ -1590,6 +1707,17 @@ export const adminDashboardStyles = `
     }
     .dashboard-grid {
       grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+    .dashboard-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
     }
   }
 `;
