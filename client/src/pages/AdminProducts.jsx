@@ -80,19 +80,31 @@ const AdminProducts = () => {
       
       const payload = {
         name: formData.name,
-        description: formData.description,
-        category_id: formData.category_id,
-        base_price: parseFloat(formData.base_price),
+        description: formData.description || null,
+        category_id: formData.category_id || null,
+        base_price: parseFloat(formData.base_price) || 0,
         stock: parseInt(formData.stock) || 0,
         is_featured: formData.is_featured,
         is_active: formData.is_active,
         weight_variants: formData.weight_variants.map(v => ({
           label: v.label,
-          weight_grams: parseInt(v.weight_grams),
-          price: parseFloat(v.price),
+          weight_grams: parseInt(v.weight_grams) || 0,
+          price: parseFloat(v.price) || 0,
           stock: parseInt(v.stock) || 0
         }))
       };
+
+      // Basic client-side validation
+      if (!payload.name) throw new Error('Product name is required');
+      if (!payload.category_id) throw new Error('Please select a category');
+      if (payload.base_price <= 0) throw new Error('Base price must be greater than 0');
+      if (payload.weight_variants.length === 0) throw new Error('At least one weight variant is required');
+      
+      for (const v of payload.weight_variants) {
+        if (!v.label || v.weight_grams <= 0 || v.price <= 0) {
+          throw new Error('All variants must have label, weight > 0, and price > 0');
+        }
+      }
 
       if (editingProduct) {
         await productsApi.updateProduct(editingProduct.id, payload);
@@ -122,7 +134,8 @@ const AdminProducts = () => {
       fetchProducts();
     } catch (err) {
       console.error('Failed to save product:', err);
-      toast.error(err?.response?.data?.error || 'Failed to save product', { id: 'img-upload' });
+      const errorMsg = err?.response?.data?.error?.message || err?.message || 'Failed to save product';
+      toast.error(errorMsg, { id: 'img-upload' });
     } finally {
       setSaving(false);
     }

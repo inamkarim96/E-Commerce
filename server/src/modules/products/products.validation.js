@@ -8,7 +8,7 @@ const variantSchema = Joi.object({
 });
 
 const createProductSchema = Joi.object({
-  category_id: Joi.string().uuid().required(),
+  category_id: Joi.string().uuid().allow(null).optional(),
   name: Joi.string().trim().min(2).max(200).required(),
   description: Joi.string().trim().allow("", null).optional(),
   base_price: Joi.number().precision(2).positive().required(),

@@ -67,8 +67,10 @@ const AdminOrders = () => {
         setSelectedOrder(prev => ({ ...prev, status: newStatus }));
       }
     } catch (err) {
-      toast.error(err?.response?.data?.error || 'Failed to update status');
+      const errorMsg = err?.response?.data?.error?.message || err?.message || 'Failed to update status';
+      toast.error(errorMsg);
     }
+
   };
 
   const handleViewOrder = async (orderId) => {
