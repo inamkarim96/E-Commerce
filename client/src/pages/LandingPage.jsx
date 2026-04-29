@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Star, ShieldCheck, Truck, RefreshCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { landingStyles } from '../shared/style';
+import { Button, Card } from '../components/ui';
+
 import * as productsApi from '../api/products';
 
 const LandingPage = () => {
@@ -52,17 +53,17 @@ const LandingPage = () => {
             Sustainable snacking for a healthier lifestyle.
           </motion.p>
           <motion.div
-            className="hero-btns"
+            className="hero-btns flex gap-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
           >
-            <Link to="/shop" className="btn btn-primary">
-              Shop Now <ArrowRight size={18} />
-            </Link>
-            <Link to="/about" className="btn btn-outline">
+            <Button as={Link} to="/shop" variant="primary" size="lg" icon={ArrowRight}>
+              Shop Now
+            </Button>
+            <Button as={Link} to="/about" variant="admin-outline" size="lg" className="border-white text-white hover:bg-white/10">
               Our Story
-            </Link>
+            </Button>
           </motion.div>
         </div>
         <div className="hero-overlay"></div>
@@ -99,35 +100,40 @@ const LandingPage = () => {
           </div>
           
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>Loading categories...</div>
+            <div className="state-msg">Loading categories...</div>
           ) : categories.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>No categories available right now.</div>
+            <div className="state-msg">No categories available right now.</div>
           ) : (
             <div className="categories-grid">
               {categories.map((cat, i) => (
-                <motion.div
+                <Card 
                   key={cat.id || i}
-                  className="category-card"
+                  as={motion.div}
+                  className="group relative overflow-hidden cursor-pointer"
                   whileHover={{ y: -10 }}
                 >
-                  <div className="category-img">
-                    <img src={cat.image || 'https://images.unsplash.com/photo-1596003906949-67221c37965c?auto=format&fit=crop&q=80&w=400'} alt={cat.name} />
+                  <div className="aspect-square overflow-hidden">
+                    <img 
+                      src={cat.image || 'https://images.unsplash.com/photo-1596003906949-67221c37965c?auto=format&fit=crop&q=80&w=400'} 
+                      alt={cat.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
                   </div>
-                  <div className="category-info">
-                    <h3>{cat.name}</h3>
-                    <span>{cat.product_count ? `${cat.product_count} Items` : 'Explore'}</span>
-                    <Link to={`/shop?category=${cat.slug}`} className="cat-link">
-                      Explore <ArrowRight size={16} />
+                  <div className="p-6 bg-white">
+                    <h3 className="text-xl font-bold text-slate-800 mb-1">{cat.name}</h3>
+                    <p className="text-xs text-slate-500 font-bold mb-4">{cat.product_count ? `${cat.product_count} Items` : 'Explore'}</p>
+                    <Link to={`/shop?category=${cat.slug}`} className="flex items-center gap-1 text-primary font-bold text-sm hover:gap-2 transition-all">
+                      Explore Collection <ArrowRight size={16} />
                     </Link>
                   </div>
-                </motion.div>
+                </Card>
               ))}
             </div>
           )}
         </div>
       </section>
 
-      <style>{landingStyles}</style>
+
     </div>
   );
 };

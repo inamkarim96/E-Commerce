@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
-import { adminManagementStyles } from '../shared/style';
+import { Search, User } from 'lucide-react';
+import { Button, Badge, Input } from '../components/ui';
+
 import * as adminApi from '../api/admin';
 import { toast } from 'react-hot-toast';
 
@@ -43,25 +44,22 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      <div className="toolbar" style={{ display: 'flex', gap: '1rem', background: 'white', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
-          <Search size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by name or email..." 
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && fetchUsers()}
-            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', flex: 1 }}
-          />
-        </div>
+      <div className="admin-toolbar">
+        <Input
+          placeholder="Search by name or email..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && fetchUsers()}
+          icon={Search}
+          containerClassName="mb-0 flex-1"
+        />
       </div>
 
       <div className="table-container">
         {loading ? (
-          <p style={{ padding: '2rem' }}>Loading users...</p>
+          <p className="state-msg">Loading users...</p>
         ) : users.length === 0 ? (
-          <p style={{ padding: '2rem', textAlign: 'center' }}>No users found.</p>
+          <p className="state-msg">No users found.</p>
         ) : (
           <table className="admin-table">
             <thead>
@@ -79,30 +77,31 @@ const AdminUsers = () => {
               {users.map(u => (
                 <tr key={u.id}>
                   <td>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#4b5563' }}>
-                      {u.name.substring(0, 2).toUpperCase()}
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xs border border-slate-200">
+                      {u.name ? u.name.substring(0, 2).toUpperCase() : <User size={14} />}
                     </div>
                   </td>
                   <td>{u.name}</td>
                   <td>{u.email}</td>
                   <td>
-                    <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', background: u.role === 'admin' ? '#fef3c7' : '#d1fae5', color: u.role === 'admin' ? '#d97706' : '#059669' }}>
+                    <Badge variant={u.role === 'admin' ? 'warning' : 'success'}>
                       {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                    </span>
+                    </Badge>
                   </td>
                   <td>
-                    <span style={{ color: u.is_active ? '#059669' : '#dc2626', fontWeight: 'bold' }}>
+                    <Badge variant={u.is_active ? 'success' : 'error'} pill={false}>
                       {u.is_active ? 'Active' : 'Suspended'}
-                    </span>
+                    </Badge>
                   </td>
                   <td>{new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                   <td>
-                    <button 
+                    <Button 
                       onClick={() => handleToggleStatus(u)}
-                      style={{ padding: '0.4rem 0.8rem', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', color: 'white', background: u.is_active ? '#dc2626' : '#059669' }}
+                      variant={u.is_active ? 'admin-danger' : 'admin-primary'}
+                      size="sm"
                     >
                       {u.is_active ? 'Suspend' : 'Activate'}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -111,7 +110,7 @@ const AdminUsers = () => {
         )}
       </div>
 
-      <style>{adminManagementStyles}</style>
+      
     </div>
   );
 };

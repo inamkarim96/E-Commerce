@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Edit2, Trash2, MoreVertical, Filter, Download, Image as ImageIcon, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { adminManagementStyles } from '../shared/style';
+import { Plus, Search, Edit2, Trash2, Filter, Image as ImageIcon, X, FolderOpen, AlertTriangle } from 'lucide-react';
+import { Button, Badge, Input, Modal, Select, Card } from '../components/ui';
+
 import * as productsApi from '../api/products';
 import { toast } from 'react-hot-toast';
 import useProducts from '../hooks/useProducts';
@@ -24,15 +24,17 @@ const AdminProducts = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const { 
-    products, 
-    categories, 
-    loading, 
-    refresh: fetchProducts, 
-    setProducts 
-  } = useProducts({ 
-    isAdmin: true, 
-    initialFilters: { limit: 100 } 
+  const {
+    products,
+    categories,
+    loading,
+    error: productsError,
+    refresh: fetchProducts,
+    refreshCategories,
+    setProducts
+  } = useProducts({
+    isAdmin: true,
+    initialFilters: { limit: 100 }
   });
 
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -40,22 +42,6 @@ const AdminProducts = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]); // For new products
   const fileInputRef = useRef(null);
-
-  const handleInitializeCategories = async () => {
-    try {
-      setSaving(true);
-      const res = await productsApi.initializeCategories();
-      if (res.success) {
-        toast.success(res.data.message);
-        window.location.reload(); // Simplest way to refresh both categories and products
-      }
-    } catch (err) {
-      console.error('Failed to initialize categories:', err);
-      toast.error('Failed to initialize categories');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const clearSelectedFiles = () => {
     selectedFiles.forEach(item => URL.revokeObjectURL(item.previewUrl));
@@ -286,9 +272,12 @@ const AdminProducts = () => {
   return (
     <div className="admin-products">
       {hasLowStock && (
-        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '500' }}>
-          ⚠️ Warning: Some products or variants are running low on stock (under 10 items).
-        </div>
+        <Card className="bg-amber-50 border-amber-200 mb-6 p-4">
+          <div className="flex items-center gap-2 text-amber-800">
+            <AlertTriangle size={20} />
+            <span className="font-semibold">Warning: Some products or variants are running low on stock (under 10 items).</span>
+          </div>
+        </Card>
       )}
 
       <div className="page-header">
@@ -296,34 +285,36 @@ const AdminProducts = () => {
           <h1>Products Management</h1>
           <p>Manage your product catalog, stock, and pricing.</p>
         </div>
-        <div className="header-actions">
+        <div className="header-actions flex gap-3">
           {categories.length === 0 && (
-            <button 
-              className="add-btn" 
-              onClick={handleInitializeCategories} 
-              style={{ background: 'var(--text-main)', marginRight: '1rem' }}
-              disabled={saving}
+            <Button 
+              variant="admin-danger" 
+              icon={FolderOpen} 
+              onClick={() => window.location.href = '/admin/categories'}
             >
-              {saving ? 'Initializing...' : 'Initialize Categories'}
-            </button>
+              Create Categories First
+            </Button>
           )}
-          <button className="add-btn" onClick={openAddModal}>
-            <Plus size={18} /> Add New Product
-          </button>
+          <Button 
+            variant="admin-primary" 
+            icon={Plus} 
+            onClick={openAddModal} 
+            disabled={categories.length === 0}
+          >
+            Add New Product
+          </Button>
         </div>
       </div>
 
-      <div className="toolbar">
-        <div className="search-bar">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Search by name or category..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchProducts({ search: searchTerm, limit: 100 })}
-          />
-        </div>
+      <div className="admin-toolbar">
+        <Input
+          placeholder="Search by name or category..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && fetchProducts({ search: searchTerm, limit: 100 })}
+          icon={Search}
+          containerClassName="mb-0 flex-1"
+        />
       </div>
 
       <div className="table-container">
@@ -351,18 +342,18 @@ const AdminProducts = () => {
                   <td>
                     <div className="prod-img">
                       {p.images?.[0] ? (
-                        <img src={p.images[0]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div style={{ width: '100%', height: '100%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <ImageIcon size={20} color="#ccc" />
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                          <ImageIcon size={20} className="text-gray-300" />
                         </div>
                       )}
                     </div>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div className="flex flex-col">
                       <strong>{p.name}</strong>
-                      <span style={{ fontSize: '0.8rem', color: '#666' }}>{p.slug}</span>
+                      <span className="text-xs text-gray-500">{p.slug}</span>
                     </div>
                   </td>
                   <td>{p.category?.name || '-'}</td>
@@ -370,22 +361,21 @@ const AdminProducts = () => {
                   <td>
                     <button 
                       onClick={() => handleStockUpdate(p.id, p.stock)}
-                      className={`stock-level ${p.stock < 10 ? 'low' : ''}`}
-                      style={{ border: '1px dashed #ccc', background: 'transparent', cursor: 'pointer' }}
+                      className={`text-sm font-bold px-2 py-1 rounded border border-dashed ${p.stock < 10 ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-300 text-slate-600'} hover:border-primary transition-colors cursor-pointer`}
                       title="Click to edit stock"
                     >
                       {p.stock} units
                     </button>
                   </td>
                   <td>
-                    <span 
-                      className={`status-pill ${p.is_active ? 'active' : 'inactive'}`} 
+                    <Badge 
+                      variant={p.is_active ? 'success' : 'error'} 
                       onClick={() => handleToggleActive(p)} 
-                      style={{ cursor: 'pointer' }}
+                      className="cursor-pointer"
                       title="Toggle Active"
                     >
                       {p.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    </Badge>
                   </td>
                   <td>
                     <input 
@@ -396,13 +386,21 @@ const AdminProducts = () => {
                     />
                   </td>
                   <td>
-                    <div className="action-group">
-                      <button className="edit-btn" onClick={() => openEditModal(p)} title="Edit">
-                        <Edit2 size={16} />
-                      </button>
-                      <button className="delete-btn" onClick={() => handleDelete(p.id)} title="Delete">
-                        <Trash2 size={16} />
-                      </button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="admin-ghost"
+                        size="sm"
+                        icon={Edit2}
+                        onClick={() => openEditModal(p)}
+                        title="Edit"
+                      />
+                      <Button
+                        variant="admin-danger"
+                        size="sm"
+                        icon={Trash2}
+                        onClick={() => handleDelete(p.id)}
+                        title="Delete"
+                      />
                     </div>
                   </td>
                 </tr>
@@ -412,204 +410,151 @@ const AdminProducts = () => {
         )}
       </div>
 
-      <AnimatePresence>
-        {showModal && (
-          <div className="modal-overlay">
-            <motion.div
-              className="modal-content"
-              style={{ maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingProduct ? 'Edit Product' : 'Add New Product'}
+        size="2xl"
+        footer={
+          <div className="flex gap-4 justify-end w-full">
+            <Button variant="admin-outline" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button 
+              variant="admin-primary" 
+              onClick={handleSave} 
+              loading={saving}
             >
-              <div className="modal-header">
-                <h2>{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
-                <button onClick={() => setShowModal(false)}><X size={24} /></button>
-              </div>
-              
-              <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Product Images</h3>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                  {/* Existing Images (Edit mode) */}
-                  {editingProduct?.images?.map((img, idx) => (
-                    <div key={`existing-${idx}`} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #ccc' }}>
-                      <img src={img} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <button 
-                        type="button"
-                        onClick={() => handleRemoveImage(img)}
-                        style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(255,0,0,0.8)', color: 'white', border: 'none', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                      >
-                        &times;
-                      </button>
-                    </div>
-                  ))}
-                  
-                  {/* Pending Images (Add mode or adding more to existing) */}
-                  {selectedFiles.map((item, idx) => (
-                    <div key={`pending-${idx}`} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--primary)', opacity: 0.8 }}>
-                      <img src={item.previewUrl} alt="Pending" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <button 
-                        type="button"
-                        onClick={() => handleRemovePendingImage(idx)}
-                        style={{ position: 'absolute', top: 0, right: 0, background: 'var(--text-main)', color: 'white', border: 'none', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                      >
-                        &times;
-                      </button>
-                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--primary)', color: 'white', fontSize: '10px', textAlign: 'center' }}>Pending</div>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <input 
-                    type="file" 
-                    multiple
-                    accept="image/jpeg, image/png, image/webp" 
-                    style={{ display: 'none' }} 
-                    ref={fileInputRef}
-                    onChange={handleImageUpload}
-                  />
-                  <button 
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImage}
-                    style={{ padding: '0.5rem 1rem', background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                  >
-                    <ImageIcon size={16} />
-                    {uploadingImage ? 'Uploading...' : 'Add Images'}
-                  </button>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                    {editingProduct ? 'Images will be uploaded immediately.' : 'Images will be uploaded after you click Create Product.'}
-                  </p>
-                </div>
-              </div>
-
-              <form className="modal-form" onSubmit={handleSave}>
-                <div className="form-group">
-                  <label>Product Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                    placeholder="e.g. Organic Dried Figs"
-                    required
-                  />
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Category</label>
-                    <select
-                      value={formData.category_id}
-                      onChange={(e) => setFormData((p) => ({ ...p, category_id: e.target.value }))}
-                      required
-                    >
-                      <option value="">Select category...</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Base Price (PKR)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.base_price}
-                      onChange={(e) => setFormData((p) => ({ ...p, base_price: e.target.value }))}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Description</label>
-                  <textarea
-                    rows="3"
-                    value={formData.description}
-                    onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
-                    placeholder="Enter product description..."
-                  />
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Base Stock</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.stock}
-                      onChange={(e) => setFormData((p) => ({ ...p, stock: e.target.value }))}
-                      placeholder="100"
-                    />
-                  </div>
-                  <div className="form-group" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={formData.is_featured}
-                        onChange={(e) => setFormData(p => ({ ...p, is_featured: e.target.checked }))}
-                      />
-                      Is Featured (Shows on Homepage)
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={formData.is_active}
-                        onChange={(e) => setFormData(p => ({ ...p, is_active: e.target.checked }))}
-                      />
-                      Is Active
-                    </label>
-                  </div>
-                </div>
-
-                {/* Weight Variants Section */}
-                <div className="form-group" style={{ marginTop: '1.5rem', padding: '1.5rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <label style={{ margin: 0, fontSize: '1.1rem' }}>Weight Variants</label>
-                    <button 
-                      type="button" 
-                      onClick={addVariantRow}
-                      style={{ padding: '0.4rem 0.8rem', background: 'var(--primary)', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}
-                    >
-                      + Add Variant
-                    </button>
-                  </div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 2fr auto', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.85rem', color: '#6b7280' }}>
-                    <span>Label (e.g. 250g)</span>
-                    <span>Weight (grams)</span>
-                    <span>Price (PKR)</span>
-                    <span>Stock</span>
-                    <span></span>
-                  </div>
-                  
-                  {formData.weight_variants.map((v, index) => (
-                    <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 2fr 2fr auto', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                      <input type="text" required placeholder="250g" value={v.label} onChange={e => updateVariantRow(index, 'label', e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                      <input type="number" required min="1" placeholder="250" value={v.weight_grams} onChange={e => updateVariantRow(index, 'weight_grams', e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                      <input type="number" required min="0" step="0.01" placeholder="1200" value={v.price} onChange={e => updateVariantRow(index, 'price', e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                      <input type="number" required min="0" placeholder="50" value={v.stock} onChange={e => updateVariantRow(index, 'stock', e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                      <button type="button" onClick={() => removeVariantRow(index)} disabled={formData.weight_variants.length === 1} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', padding: '0.5rem' }}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="form-actions">
-                  <button type="button" className="cancel-btn" onClick={() => setShowModal(false)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="save-btn" disabled={saving}>
-                    {saving ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+              {editingProduct ? 'Update Product' : 'Create Product'}
+            </Button>
           </div>
-        )}
-      </AnimatePresence>
+        }
+      >
+        <div className="space-y-8">
+          {/* Images Section */}
+          <div>
+            <h3 className="text-lg font-bold mb-4">Product Images</h3>
+            <div className="admin-img-preview-grid">
+              {editingProduct?.images?.map((img, idx) => (
+                <div key={`existing-${idx}`} className="admin-img-thumb">
+                  <img src={img} alt="Product" />
+                  <button type="button" onClick={() => handleRemoveImage(img)} className="admin-img-remove"><X size={12} /></button>
+                </div>
+              ))}
+              {selectedFiles.map((item, idx) => (
+                <div key={`pending-${idx}`} className="admin-img-thumb pending">
+                  <img src={item.previewUrl} alt="Pending" />
+                  <button type="button" onClick={() => handleRemovePendingImage(idx)} className="admin-img-remove"><X size={12} /></button>
+                  <div className="admin-img-pending-badge">Pending</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 p-4 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+              <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
+              <Button 
+                variant="admin-ghost" 
+                icon={ImageIcon} 
+                onClick={() => fileInputRef.current?.click()}
+                loading={uploadingImage}
+              >
+                {uploadingImage ? 'Uploading...' : 'Add Images'}
+              </Button>
+              <p className="text-[11px] text-slate-500 mt-2">
+                {editingProduct ? 'Changes apply instantly.' : 'Uploads after creation.'}
+              </p>
+            </div>
+          </div>
 
-      <style>{adminManagementStyles}</style>
+          {/* Core Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input
+              label="Product Name"
+              value={formData.name}
+              onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+              placeholder="Organic Dried Figs"
+              required
+              containerClassName="md:col-span-2"
+            />
+            <Select
+              label="Category"
+              value={formData.category_id}
+              onChange={(e) => setFormData((p) => ({ ...p, category_id: e.target.value }))}
+              disabled={categories.length === 0}
+              options={[
+                { value: '', label: 'No Category' },
+                ...categories.map(cat => ({ value: cat.id, label: cat.name }))
+              ]}
+            />
+            <Input
+              label="Base Price (PKR)"
+              type="number"
+              value={formData.base_price}
+              onChange={(e) => setFormData((p) => ({ ...p, base_price: e.target.value }))}
+              placeholder="0.00"
+              required
+            />
+            <Input
+              label="Description"
+              as="textarea"
+              rows={3}
+              value={formData.description}
+              onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
+              containerClassName="md:col-span-2"
+            />
+            <Input
+              label="Base Stock"
+              type="number"
+              value={formData.stock}
+              onChange={(e) => setFormData((p) => ({ ...p, stock: e.target.value }))}
+              placeholder="100"
+            />
+            <div className="flex gap-6 items-center pt-6">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                <input type="checkbox" checked={formData.is_featured} onChange={(e) => setFormData(p => ({ ...p, is_featured: e.target.checked }))} className="w-4 h-4 rounded text-primary" />
+                Featured
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                <input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData(p => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 rounded text-primary" />
+                Active
+              </label>
+            </div>
+          </div>
+
+          {/* Weight Variants */}
+          <Card className="border-slate-200 bg-slate-50/50" title={
+            <div className="flex justify-between items-center w-full">
+              <span>Weight Variants</span>
+              <Button variant="admin-primary" size="sm" onClick={addVariantRow} type="button">+ Add</Button>
+            </div>
+          }>
+            <div className="space-y-4">
+              <div className="hidden md:grid grid-cols-5 gap-4 text-xs font-bold text-slate-400 px-1">
+                <span>Label</span>
+                <span>Weight (g)</span>
+                <span>Price (PKR)</span>
+                <span>Stock</span>
+                <span></span>
+              </div>
+              {formData.weight_variants.map((v, index) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
+                  <Input value={v.label} onChange={e => updateVariantRow(index, 'label', e.target.value)} placeholder="250g" containerClassName="mb-0" />
+                  <Input type="number" value={v.weight_grams} onChange={e => updateVariantRow(index, 'weight_grams', e.target.value)} placeholder="250" containerClassName="mb-0" />
+                  <Input type="number" value={v.price} onChange={e => updateVariantRow(index, 'price', e.target.value)} placeholder="1200" containerClassName="mb-0" />
+                  <Input type="number" value={v.stock} onChange={e => updateVariantRow(index, 'stock', e.target.value)} placeholder="50" containerClassName="mb-0" />
+                  <Button 
+                    variant="admin-ghost" 
+                    size="sm" 
+                    icon={Trash2} 
+                    onClick={() => removeVariantRow(index)} 
+                    disabled={formData.weight_variants.length === 1}
+                    className="text-red-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </Modal>
+
+      
     </div>
   );
 };

@@ -9,8 +9,19 @@
     "test": "jest",
     "build": "prisma generate",
     "postinstall": "prisma generate",
-    "migrate": "prisma migrate dev",
-    "seed": "prisma db seed"
+    "db:studio": "prisma studio",
+    "db:status": "prisma migrate status",
+    "db:check": "prisma db pull --print",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:format": "prisma format",
+    "db:pull": "prisma db pull",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:name": "prisma migrate dev --name",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:reset": "prisma migrate reset",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

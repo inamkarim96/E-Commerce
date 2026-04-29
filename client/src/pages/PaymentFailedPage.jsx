@@ -2,7 +2,8 @@ import React from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { XCircle, RefreshCw, ShoppingCart } from 'lucide-react';
-import { paymentFailedStyles } from '../shared/style';
+import { Button, Badge, Card } from '../components/ui';
+
 
 /**
  * PaymentFailedPage
@@ -26,60 +27,65 @@ const PaymentFailedPage = () => {
   return (
     <div className="failed-page">
       <div className="container">
-        <motion.div
-          className="failed-card"
+        <Card 
+          as={motion.div}
+          className="max-w-xl mx-auto p-12 text-center"
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.45, ease: 'easeOut' }}
         >
-          <div className="fail-icon">
-            <XCircle size={80} strokeWidth={1.5} />
+          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner shadow-red-100">
+            <XCircle size={56} strokeWidth={1.5} />
           </div>
 
-          <h1>Payment Failed</h1>
+          <h1 className="text-3xl font-black text-slate-800 mb-4">Payment Failed</h1>
 
-          <p className="sub-text">
+          <p className="text-slate-500 mb-8 leading-relaxed">
             We weren't able to process your payment. Your order has been saved and
             no money was deducted from your account.
           </p>
 
-          <span className="error-code">{errorLabel}</span>
+          <Badge variant="error" className="px-4 py-1.5 rounded-full text-xs font-bold mb-10">
+            {errorLabel}
+          </Badge>
 
-          <div className="failed-actions">
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
             {orderId ? (
-              <Link
+              <Button
+                as={Link}
                 to="/checkout"
-                className="btn btn-primary"
-                style={{ background: 'var(--primary)', color: 'white' }}
+                variant="primary"
+                size="lg"
+                icon={RefreshCw}
+                className="flex-1"
               >
-                <RefreshCw size={18} />
                 Try Again
-              </Link>
+              </Button>
             ) : null}
 
-            <Link
+            <Button
+              as={Link}
               to="/shop"
-              className="btn btn-outline"
-              style={{
-                border: '2px solid var(--border)',
-                color: 'var(--text-main)',
-                background: 'transparent',
-              }}
+              variant="admin-outline"
+              size="lg"
+              icon={ShoppingCart}
+              className="flex-1"
             >
-              <ShoppingCart size={18} />
               Back to Shop
-            </Link>
+            </Button>
           </div>
 
           {orderId && (
-            <p style={{ marginTop: '2rem', fontSize: '0.85rem', color: 'var(--text-light)' }}>
-              Order reference: <strong>{orderId}</strong>
-            </p>
+            <div className="mt-12 pt-6 border-t border-slate-100">
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">
+                Order reference: <span className="text-slate-800">{orderId}</span>
+              </p>
+            </div>
           )}
-        </motion.div>
+        </Card>
       </div>
 
-      <style>{paymentFailedStyles}</style>
+
     </div>
   );
 };

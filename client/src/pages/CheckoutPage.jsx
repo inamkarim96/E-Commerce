@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { CreditCard, CheckCircle, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { checkoutStyles } from '../shared/style';
+import { Button, Badge, Input, Card } from '../components/ui';
+
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import * as ordersApi from '../api/orders';
@@ -196,15 +197,7 @@ const CheckoutPage = () => {
 
             {/* Error Banner */}
             {error && (
-              <div
-                style={{
-                  padding: '1rem',
-                  background: '#fee2e2',
-                  color: '#b91c1c',
-                  borderRadius: '8px',
-                  marginBottom: '2rem',
-                }}
-              >
+              <div className="bg-red-50 border border-red-100 text-red-700 p-4 rounded-xl mb-6 text-sm font-medium">
                 {error}
               </div>
             )}
@@ -222,62 +215,49 @@ const CheckoutPage = () => {
                     exit={{ opacity: 0, x: -20 }}
                     className="form-step"
                   >
-                    <h2>Shipping Information</h2>
-                    <div className="form-grid">
-                      <div className="form-group full">
-                        <label>Email Address</label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={formData.email}
-                          onChange={handleInputChange}
-                          placeholder="you@example.com"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>First Name</label>
-                        <input
-                          type="text"
+                    <h2 className="text-2xl font-bold mb-6">Shipping Information</h2>
+                    <div className="space-y-4">
+                      <Input
+                        label="Email Address"
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        placeholder="you@example.com"
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input
+                          label="First Name"
                           name="firstName"
                           value={formData.firstName}
                           onChange={handleInputChange}
-                          placeholder="your name "
+                          placeholder="Jane"
                         />
-                      </div>
-                      <div className="form-group">
-                        <label>Last Name</label>
-                        <input
-                          type="text"
+                        <Input
+                          label="Last Name"
                           name="lastName"
                           value={formData.lastName}
                           onChange={handleInputChange}
                           placeholder="Doe"
                         />
                       </div>
-                      <div className="form-group full">
-                        <label>Street Address</label>
-                        <input
-                          type="text"
-                          name="address"
-                          value={formData.address}
-                          onChange={handleInputChange}
-                          placeholder="123 Nature St"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>City</label>
-                        <input
-                          type="text"
+                      <Input
+                        label="Street Address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                        placeholder="123 Nature St"
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input
+                          label="City"
                           name="city"
                           value={formData.city}
                           onChange={handleInputChange}
                           placeholder="Karachi"
                         />
-                      </div>
-                      <div className="form-group">
-                        <label>ZIP / Postal Code</label>
-                        <input
-                          type="text"
+                        <Input
+                          label="ZIP / Postal Code"
                           name="zipCode"
                           value={formData.zipCode}
                           onChange={handleInputChange}
@@ -285,9 +265,11 @@ const CheckoutPage = () => {
                         />
                       </div>
                     </div>
-                    <button className="next-btn" onClick={() => setStep(2)}>
-                      Continue to Payment <ArrowRight size={18} />
-                    </button>
+                    <div className="pt-8">
+                      <Button variant="primary" size="lg" className="w-full h-14 text-lg" onClick={() => setStep(2)} icon={ArrowRight}>
+                        Continue to Payment
+                      </Button>
+                    </div>
                   </motion.div>
                 )}
 
@@ -300,83 +282,60 @@ const CheckoutPage = () => {
                     exit={{ opacity: 0, x: -20 }}
                     className="form-step"
                   >
-                    <h2>Payment Method</h2>
-                    <div className="payment-options">
-                      <label
-                        className={`payment-card ${formData.paymentMethod === 'card' ? 'selected' : ''
-                          }`}
-                      >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="card"
-                          checked={formData.paymentMethod === 'card'}
-                          onChange={handleInputChange}
-                        />
-                        <CreditCard size={24} />
-                        <div className="payment-info">
-                          <span>Credit / Debit Card</span>
-                          <p>Secure payment via Stripe</p>
+                    <h2 className="text-2xl font-bold mb-6">Payment Method</h2>
+                    <div className="space-y-4 mb-8">
+                      <label className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${formData.paymentMethod === 'card' ? 'border-primary bg-emerald-50' : 'border-slate-100 hover:border-slate-200'}`}>
+                        <input type="radio" name="paymentMethod" value="card" checked={formData.paymentMethod === 'card'} onChange={handleInputChange} className="w-5 h-5 text-primary" />
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-primary">
+                          <CreditCard size={24} />
+                        </div>
+                        <div className="flex-1">
+                          <span className="block font-bold text-slate-800">Credit / Debit Card</span>
+                          <p className="text-sm text-slate-500 m-0">Secure payment via Stripe</p>
                         </div>
                       </label>
-                      <label
-                        className={`payment-card ${formData.paymentMethod === 'jazzcash' ? 'selected' : ''
-                          }`}
-                      >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="jazzcash"
-                          checked={formData.paymentMethod === 'jazzcash'}
-                          onChange={handleInputChange}
-                        />
-                        <span className="jazz-logo">JC</span>
-                        <div className="payment-info">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span>JazzCash / Easypaisa</span>
-                            <span className="badge-secure">
-                              <ShieldCheck size={10} /> SECURE
-                            </span>
+
+                      <label className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${formData.paymentMethod === 'jazzcash' ? 'border-primary bg-emerald-50' : 'border-slate-100 hover:border-slate-200'}`}>
+                        <input type="radio" name="paymentMethod" value="jazzcash" checked={formData.paymentMethod === 'jazzcash'} onChange={handleInputChange} className="w-5 h-5 text-primary" />
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm font-black text-red-600 italic">JC</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-800">JazzCash / Easypaisa</span>
+                            <Badge variant="success" className="text-[10px] scale-75">SECURE</Badge>
                           </div>
-                          <p>Local mobile wallet payment</p>
+                          <p className="text-sm text-slate-500 m-0">Local mobile wallet payment</p>
                         </div>
                       </label>
-                      <label
-                        className={`payment-card ${formData.paymentMethod === 'cod' ? 'selected' : ''
-                          }`}
-                      >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="cod"
-                          checked={formData.paymentMethod === 'cod'}
-                          onChange={handleInputChange}
-                        />
-                        <CheckCircle size={24} />
-                        <div className="payment-info">
-                          <span>Cash on Delivery</span>
-                          <p>Pay when you receive the order</p>
+
+                      <label className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${formData.paymentMethod === 'cod' ? 'border-primary bg-emerald-50' : 'border-slate-100 hover:border-slate-200'}`}>
+                        <input type="radio" name="paymentMethod" value="cod" checked={formData.paymentMethod === 'cod'} onChange={handleInputChange} className="w-5 h-5 text-primary" />
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-slate-400">
+                          <CheckCircle size={24} />
+                        </div>
+                        <div className="flex-1">
+                          <span className="block font-bold text-slate-800">Cash on Delivery</span>
+                          <p className="text-sm text-slate-500 m-0">Pay when you receive the order</p>
                         </div>
                       </label>
                     </div>
 
-                    <div className="card-fields">
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    <Card className="bg-slate-50 border-none mb-8">
+                      <p className="text-slate-500 text-sm m-0 italic">
                         {formData.paymentMethod === 'card'
                           ? 'You will be redirected to Stripe to securely enter your card details.'
                           : formData.paymentMethod === 'jazzcash'
                             ? 'You will be redirected to the JazzCash portal to complete your payment.'
                             : 'Order now and pay with cash when your package is delivered.'}
                       </p>
-                    </div>
+                    </Card>
 
-                    <div className="btn-row">
-                      <button className="back-btn" onClick={() => setStep(1)}>
-                        <ArrowLeft size={18} /> Back
-                      </button>
-                      <button className="next-btn" onClick={() => setStep(3)}>
-                        Review Order <ArrowRight size={18} />
-                      </button>
+                    <div className="flex gap-4">
+                      <Button variant="admin-outline" size="lg" className="flex-1 h-14" onClick={() => setStep(1)} icon={ArrowLeft}>
+                        Back
+                      </Button>
+                      <Button variant="primary" size="lg" className="flex-[2] h-14" onClick={() => setStep(3)} icon={ArrowRight}>
+                        Review Order
+                      </Button>
                     </div>
                   </motion.div>
                 )}
@@ -390,42 +349,41 @@ const CheckoutPage = () => {
                     exit={{ opacity: 0, x: -20 }}
                     className="form-step"
                   >
-                    <h2>Review Your Order</h2>
-                    <div className="review-summary">
-                      <div className="review-section">
-                        <h3>Shipping to:</h3>
-                        <p>
-                          {formData.firstName} {formData.lastName}
-                        </p>
-                        <p>
+                    <h2 className="text-2xl font-bold mb-6">Review Your Order</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                      <Card className="bg-slate-50 border-none p-5">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Shipping to:</h3>
+                        <p className="font-bold text-slate-800 m-0">{formData.firstName} {formData.lastName}</p>
+                        <p className="text-sm text-slate-600 m-0 mt-1 italic">
                           {formData.address}, {formData.city}, {formData.zipCode}
                         </p>
-                      </div>
-                      <div className="review-section">
-                        <h3>Payment:</h3>
-                        <p>
+                      </Card>
+                      <Card className="bg-slate-50 border-none p-5">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Payment:</h3>
+                        <p className="font-bold text-slate-800 m-0">
                           {formData.paymentMethod === 'card'
                             ? 'Credit Card (Stripe)'
                             : formData.paymentMethod === 'jazzcash'
                               ? 'JazzCash Wallet'
                               : 'Cash on Delivery'}
                         </p>
-                      </div>
+                        <Badge variant="info" className="mt-2 text-[10px]">VERIFIED METHOD</Badge>
+                      </Card>
                     </div>
 
-                    <div className="btn-row">
-                      <button className="back-btn" onClick={() => setStep(2)}>
-                        <ArrowLeft size={18} /> Back
-                      </button>
-                      <button
-                        className="place-order-btn"
-                        onClick={handlePlaceOrder}
-                        disabled={loading}
+                    <div className="flex gap-4">
+                      <Button variant="admin-outline" size="lg" className="flex-1 h-14" onClick={() => setStep(2)} icon={ArrowLeft}>
+                        Back
+                      </Button>
+                      <Button 
+                        variant="primary" 
+                        size="lg" 
+                        className="flex-[2] h-14 text-lg" 
+                        onClick={handlePlaceOrder} 
+                        loading={loading}
                       >
-                        {loading
-                          ? 'Processing...'
-                          : `Place Order PKR ${Math.round(total).toLocaleString()}`}
-                      </button>
+                        {loading ? 'Processing...' : `Place Order • PKR ${Math.round(total).toLocaleString()}`}
+                      </Button>
                     </div>
                   </motion.div>
                 )}
@@ -435,95 +393,87 @@ const CheckoutPage = () => {
           </div>
 
           {/* ── Order Summary Sidebar ── */}
-          <aside className="checkout-summary">
-            <h3>Order Items</h3>
-            <div className="summary-items">
-              {cart.map((item) => (
-                <div
-                  key={`${item.id}-${item.selectedWeight}`}
-                  className="summary-item"
-                >
-                  <div className="sum-img">
-                    <img
-                      src={item.images?.[0] || item.image}
-                      alt={item.name}
-                    />
-                    <span className="sum-qty">{item.quantity}</span>
-                  </div>
-                  <div className="sum-info">
-                    <h4>{item.name}</h4>
-                    <span>
-                      {typeof item.selectedWeight === 'object' 
-                        ? item.selectedWeight.label 
-                        : item.selectedWeight}
+          <aside className="checkout-summary h-fit">
+            <Card className="bg-slate-50/50 border-slate-200 p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-6">Order Items</h3>
+              <div className="space-y-4 mb-8">
+                {cart.map((item) => (
+                  <div key={`${item.id}-${item.selectedWeight}`} className="flex gap-4 items-center">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-white">
+                        <img src={item.images?.[0] || item.image} alt={item.name} className="w-full h-full object-cover" />
+                      </div>
+                      <Badge variant="info" className="absolute -top-2 -right-2 scale-75 px-2">
+                        {item.quantity}
+                      </Badge>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-slate-800 text-sm truncate">{item.name}</h4>
+                      <p className="text-xs text-slate-500">
+                        {typeof item.selectedWeight === 'object' ? item.selectedWeight.label : item.selectedWeight}
+                      </p>
+                    </div>
+                    <span className="font-bold text-slate-700 text-sm">
+                      PKR {(item.price * item.quantity).toLocaleString()}
                     </span>
                   </div>
-                  <span className="sum-price">
-                    PKR {(item.price * item.quantity).toLocaleString()}
+                ))}
+              </div>
+
+              <div className="space-y-3 pt-6 border-t border-slate-200 mb-6">
+                <div className="flex justify-between text-sm text-slate-600 font-medium">
+                  <span>Subtotal</span>
+                  <span>PKR {subtotal.toLocaleString()}</span>
+                </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-600 font-bold">
+                    <span>Discount</span>
+                    <span>-PKR {discount.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm text-slate-600 font-medium">
+                  <span>Shipping</span>
+                  <span className={shipping === 0 ? 'text-emerald-600 font-bold' : ''}>
+                    {shipping === 0 ? 'FREE' : `PKR ${shipping.toLocaleString()}`}
                   </span>
                 </div>
-              ))}
-            </div>
-
-            <div className="summary-costs">
-              <div className="cost-row">
-                <span>Subtotal</span>
-                <span>PKR {subtotal.toLocaleString()}</span>
-              </div>
-              {discount > 0 && (
-                <div className="cost-row discount">
-                  <span>Discount</span>
-                  <span style={{ color: '#059669' }}>-PKR {discount.toLocaleString()}</span>
+                <div className="flex justify-between pt-4 border-t border-slate-200">
+                  <span className="text-lg font-bold text-slate-800">Total</span>
+                  <span className="text-2xl font-bold text-primary">PKR {Math.round(total).toLocaleString()}</span>
                 </div>
-              )}
-              <div className="cost-row">
-                <span>Shipping</span>
-                <span>
-                  {shipping === 0 ? 'FREE' : `PKR ${shipping.toLocaleString()}`}
-                </span>
               </div>
-              <div className="cost-total">
-                <span>Total</span>
-                <span>PKR {Math.round(total).toLocaleString()}</span>
+
+              <div className="promo-section pb-6 border-b border-slate-200 mb-6">
+                 <div className="flex gap-2">
+                    <Input
+                      placeholder="Promo Code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      containerClassName="mb-0 flex-1"
+                      className="h-10"
+                    />
+                    <Button variant="admin-primary" size="sm" onClick={handleApplyPromo} loading={promoLoading} className="h-10">
+                      Apply
+                    </Button>
+                 </div>
+                 {promoMsg && (
+                   <p className={`text-xs mt-2 font-bold ${promoMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
+                     {promoMsg.text}
+                   </p>
+                 )}
               </div>
-            </div>
 
-            <div className="promo-section">
-               <div className="promo-input-group">
-                  <input
-                    type="text"
-                    placeholder="Promo Code"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value)}
-                  />
-                  <button 
-                    onClick={handleApplyPromo} 
-                    disabled={promoLoading}
-                  >
-                    {promoLoading ? '...' : 'Apply'}
-                  </button>
-               </div>
-               {promoMsg && (
-                 <p style={{ 
-                    fontSize: '0.8rem', 
-                    marginTop: '0.5rem', 
-                    color: promoMsg.type === 'success' ? '#059669' : '#dc2626' 
-                 }}>
-                   {promoMsg.text}
-                 </p>
-               )}
-            </div>
-
-            <div className="checkout-guarantee">
-              <ShieldCheck size={18} />
-              <span>100% Secure Transaction</span>
-            </div>
+              <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-medium">
+                <ShieldCheck size={18} className="text-emerald-500" />
+                <span>100% Secure Transaction</span>
+              </div>
+            </Card>
           </aside>
 
         </div>
       </div>
 
-      <style>{checkoutStyles}</style>
+
     </div>
   );
 };

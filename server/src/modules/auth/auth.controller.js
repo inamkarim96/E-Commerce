@@ -143,7 +143,11 @@ async function firebaseLogin(req, res) {
   }
 
   const result = await authService.firebaseLogin(idToken, profileData);
-  setRefreshCookie(res, result.refreshToken);
+
+  // Only set cookie when tokens are present (not during verification flow)
+  if (result.refreshToken) {
+    setRefreshCookie(res, result.refreshToken);
+  }
 
   return sendSuccess(res, {
     accessToken: result.accessToken,

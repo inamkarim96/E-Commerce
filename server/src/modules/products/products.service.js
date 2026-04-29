@@ -59,17 +59,52 @@ async function listProducts(filters) {
   const skip = (page - 1) * limit;
 
   const where = { is_active: true };
+
+  // Search by name or description
+  if (filters.q) {
+    where.OR = [
+      { name: { contains: filters.q, mode: 'insensitive' } },
+      { description: { contains: filters.q, mode: 'insensitive' } }
+    ];
+  }
+
+  // Filter by category slug
   if (filters.category) {
     where.categories = { slug: filters.category };
   }
-  if (filters.min_price !== undefined) {
-    where.base_price = { gte: filters.min_price };
+
+  // Filter by price range
+  if (filters.min_price !== undefined || filters.max_price !== undefined) {
+    where.base_price = {};
+    if (filters.min_price !== undefined) {
+      where.base_price.gte = filters.min_price;
+    }
+    if (filters.max_price !== undefined) {
+      where.base_price.lte = filters.max_price;
+    }
   }
-  if (filters.max_price !== undefined) {
-    where.base_price = { ...where.base_price, lte: filters.max_price };
-  }
+
+  // Filter by featured
   if (filters.featuredOnly) {
     where.is_featured = true;
+  }
+
+  // Filter by weight variant
+  if (filters.weight_label || filters.min_weight || filters.max_weight) {
+    where.weight_variants = {
+      some: {
+        AND: [
+          filters.weight_label ? { label: { contains: filters.weight_label, mode: 'insensitive' } } : {},
+          filters.min_weight ? { weight_grams: { gte: parseInt(filters.min_weight) } } : {},
+          filters.max_weight ? { weight_grams: { lte: parseInt(filters.max_weight) } } : {}
+        ].filter(Boolean)
+      }
+    };
+  }
+
+  // Filter by stock availability
+  if (filters.in_stock) {
+    where.stock = { gt: 0 };
   }
 
   let orderBy = { created_at: "desc" };
@@ -79,6 +114,8 @@ async function listProducts(filters) {
     orderBy = { base_price: "desc" };
   } else if (filters.sort === "popular") {
     orderBy = { reviews: { _count: "desc" } };
+  } else if (filters.sort === "name_asc") {
+    orderBy = { name: "asc" };
   }
 
   const [total, rows] = await prisma.$transaction([
@@ -231,19 +268,22 @@ async function getProductBySlug(slug) {
 
 async function createProduct(payload) {
   return prisma.$transaction(async (tx) => {
-    const category = await tx.categories.findUnique({
-      where: { id: payload.category_id }
-    });
-    if (!category) {
-      throw new ApiError(400, "Invalid category", "INVALID_CATEGORY");
+    // Validate category only if provided
+    if (payload.category_id) {
+      const category = await tx.categories.findUnique({
+        where: { id: payload.category_id }
+      });
+      if (!category) {
+        throw new ApiError(400, "Invalid category", "INVALID_CATEGORY");
+      }
     }
 
     const slug = await ensureUniqueSlug(payload.name);
-    const totalVariantStock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
-    
+    const totalVariantStock = payload.weight_variants?.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0) || 0;
+
     const product = await tx.products.create({
       data: {
-        category_id: payload.category_id,
+        category_id: payload.category_id || null,
         name: payload.name,
         slug,
         description: payload.description || null,
@@ -253,12 +293,12 @@ async function createProduct(payload) {
         is_featured: payload.is_featured ?? false,
         is_active: payload.is_active ?? true,
         weight_variants: {
-          create: payload.weight_variants.map((v) => ({
+          create: payload.weight_variants?.map((v) => ({
             label: v.label,
             weight_grams: v.weight_grams,
             price: v.price,
             stock: v.stock ?? 0
-          }))
+          })) || []
         }
       }
     });
@@ -278,12 +318,17 @@ async function updateProduct(id, payload) {
       updated_at: new Date()
     };
 
-    if (payload.category_id) {
-      const category = await tx.categories.findUnique({ where: { id: payload.category_id } });
-      if (!category) {
-        throw new ApiError(400, "Invalid category", "INVALID_CATEGORY");
+    if (payload.category_id !== undefined) {
+      if (payload.category_id) {
+        const category = await tx.categories.findUnique({ where: { id: payload.category_id } });
+        if (!category) {
+          throw new ApiError(400, "Invalid category", "INVALID_CATEGORY");
+        }
+        data.category_id = payload.category_id;
+      } else {
+        // Allow clearing category
+        data.category_id = null;
       }
-      data.category_id = payload.category_id;
     }
     if (payload.name && payload.name !== existing.name) {
       data.name = payload.name;

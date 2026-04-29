@@ -2,7 +2,7 @@ import React from 'react';
 import { ShoppingCart, Eye, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { productCardStyles } from '../shared/style';
+
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-hot-toast';
 
@@ -79,7 +79,7 @@ const ProductCard = ({ product }) => {
         </div>
       </div>
 
-      <style>{productCardStyles}</style>
+
     </motion.div>
   );
 };

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, User, Menu, X, Leaf } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { navbarStyles } from '../shared/style';
+
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -77,7 +77,7 @@ const Navbar = () => {
         ))}
       </div>
 
-      <style>{navbarStyles}</style>
+
     </nav>
   );
 };

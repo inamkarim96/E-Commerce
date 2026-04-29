@@ -93,7 +93,8 @@ async function register(payload) {
           }
         }
       } : {} )
-    }
+    },
+    include: { addresses: true }
   });
 
   // With Firebase, we don't need a custom verification code in the cache.
@@ -112,7 +113,7 @@ async function login(payload) {
       throw new ApiError(401, "Invalid admin credentials", "INVALID_CREDENTIALS");
     }
 
-    let user = await prisma.users.findUnique({ 
+    let user = await prisma.users.findUnique({
       where: { email: ADMIN_EMAIL },
       include: { addresses: { where: { is_default: true } } }
     });
@@ -126,51 +127,36 @@ async function login(payload) {
           role: 'admin',
           password_hash: await bcrypt.hash(ADMIN_PASSWORD, 12),
           is_active: true,
-          email_verified: false,
+          email_verified: true,
           failed_login_attempts: 0
         }
       });
-    } else if (user.role !== 'admin') {
-      // Sync role if it was changed
-      user = await prisma.users.update({
-        where: { id: user.id },
-        data: { role: 'admin', updated_at: new Date() }
-      });
+    } else {
+      const updates = {};
+      if (user.role !== 'admin') {
+        updates.role = 'admin';
+      }
+      if (!user.is_active || !user.email_verified) {
+        updates.is_active = true;
+        updates.email_verified = true;
+      }
+      if (Object.keys(updates).length > 0) {
+        updates.updated_at = new Date();
+        user = await prisma.users.update({
+          where: { id: user.id },
+          data: updates,
+          include: { addresses: { where: { is_default: true } } }
+        });
+      }
     }
 
-    // Ensure Admin exists in Firebase and reset verification status
-    let firebaseUser;
-    try {
-      firebaseUser = await firebaseAuth.getUserByEmail(ADMIN_EMAIL);
-    } catch (e) {
-      // Create if not exists
-      firebaseUser = await firebaseAuth.createUser({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        displayName: 'Admin',
-        emailVerified: false
-      });
-    }
+    const cleanUser = sanitizeUser(user);
+    const accessToken = createAccessToken(cleanUser);
+    const refreshToken = createRefreshToken(cleanUser);
 
-    // Sync UID if not set
-    if (!user.firebase_uid) {
-      user = await prisma.users.update({
-        where: { id: user.id },
-        data: { firebase_uid: firebaseUser.uid }
-      });
-    }
+    await cache.set(`refresh:${cleanUser.id}`, hashToken(refreshToken), "EX", 7 * 24 * 60 * 60);
 
-    // Force emailVerified to false in Firebase for Admin (for 2FA every time)
-    await firebaseAuth.updateUser(firebaseUser.uid, { emailVerified: false });
-
-    // Generate a Custom Token for the frontend to sign in with
-    const customToken = await firebaseAuth.createCustomToken(firebaseUser.uid);
-    
-    return { 
-      status: 'VERIFICATION_REQUIRED', 
-      email: ADMIN_EMAIL,
-      customToken 
-    };
+    return { user: cleanUser, accessToken, refreshToken };
   }
 
   const user = await prisma.users.findUnique({
@@ -462,6 +448,11 @@ async function firebaseLogin(idToken, profileData = null) {
     const finalName = profileData?.name || name || email?.split('@')[0] || 'User';
     const finalPhone = profileData?.phone || phone_number || null;
 
+    // Use actual password if provided, otherwise generate a random one
+    const passwordHash = profileData?.password
+      ? await bcrypt.hash(profileData.password, 12)
+      : await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+
     user = await prisma.users.create({
       data: {
         firebase_uid: uid,
@@ -471,7 +462,7 @@ async function firebaseLogin(idToken, profileData = null) {
         is_active: true,
         email_verified: decodedToken.email_verified || false,
         role,
-        password_hash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12),
+        password_hash: passwordHash,
         // Create address if provided
         ...( (profileData?.address || profileData?.city || profileData?.country) ? {
           addresses: {
@@ -485,14 +476,16 @@ async function firebaseLogin(idToken, profileData = null) {
             }
           }
         } : {} )
-      }
+      },
+      include: { addresses: { where: { is_default: true } } }
     });
   } else {
     // Sync roles for the fixed admin
     if (isAuthorizedAdmin && user.role !== 'admin') {
       user = await prisma.users.update({
         where: { id: user.id },
-        data: { role: 'admin', updated_at: new Date() }
+        data: { role: 'admin', updated_at: new Date() },
+        include: { addresses: { where: { is_default: true } } }
       });
     }
 
@@ -501,20 +494,28 @@ async function firebaseLogin(idToken, profileData = null) {
       throw new ApiError(403, "Access denied. Unauthorized admin credentials.", "UNAUTHORIZED_ADMIN");
     }
 
+    // Build update payload for missing data
+    const updateData = {};
     if (!user.firebase_uid) {
+      updateData.firebase_uid = uid;
+      updateData.email_verified = decodedToken.email_verified || false;
+    }
+    // Merge profileData fields if existing user record is incomplete
+    if (profileData?.name && !user.name) updateData.name = profileData.name;
+    if (profileData?.phone && !user.phone) updateData.phone = profileData.phone;
+
+    if (Object.keys(updateData).length > 0) {
+      updateData.updated_at = new Date();
       user = await prisma.users.update({
         where: { id: user.id },
-        data: {
-          firebase_uid: uid,
-          email_verified: decodedToken.email_verified || false,
-          updated_at: new Date()
-        }
+        data: updateData,
+        include: { addresses: { where: { is_default: true } } }
       });
     }
   }
 
-  // Check if email verification is required
-  if (user.email && !decodedToken.email_verified) {
+  // Check if email verification is required (skip for admin)
+  if (user.role !== 'admin' && user.email && !decodedToken.email_verified) {
     return { status: 'VERIFICATION_REQUIRED', email: user.email };
   }
 

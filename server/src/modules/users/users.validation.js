@@ -2,9 +2,7 @@ const Joi = require("joi");
 
 const updateProfileSchema = Joi.object({
   name: Joi.string().min(2).optional(),
-  phone: Joi.string().pattern(/^\+92-\d{3}-\d{7}$/).messages({
-    'string.pattern.base': 'Phone must be in Pakistani format (+92-xxx-xxxxxxx)'
-  }).optional()
+  phone: Joi.string().min(7).max(20).optional()
 });
 
 const changePasswordSchema = Joi.object({
@@ -14,13 +12,11 @@ const changePasswordSchema = Joi.object({
 
 const addressSchema = Joi.object({
   full_name: Joi.string().required(),
-  phone: Joi.string().pattern(/^\+92-\d{3}-\d{7}$/).messages({
-    'string.pattern.base': 'Phone must be in Pakistani format (+92-xxx-xxxxxxx)'
-  }).required(),
+  phone: Joi.string().min(7).max(20).required(),
   address_line: Joi.string().required(),
   city: Joi.string().required(),
-  province: Joi.string().required(),
-  postal_code: Joi.string().required(),
+  province: Joi.string().optional().allow(''),
+  postal_code: Joi.string().optional().allow(''),
   country: Joi.string().default("PK"),
   is_default: Joi.boolean().default(false)
 });

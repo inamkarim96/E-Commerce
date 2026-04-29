@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Star, Heart, ShieldCheck, Truck, ArrowLeft, Plus, Minus } from 'lucide-react';
+import { Button, Badge, Card } from '../components/ui';
 import ProductCard from '../components/ProductCard';
-import { productDetailStyles } from '../shared/style';
+
 import * as productsApi from '../api/products';
 import { useCart } from '../context/CartContext';
 
@@ -56,8 +57,8 @@ const ProductDetailPage = () => {
     setQuantity(1);
   }, [selectedWeight]);
 
-  if (loading) return <div className="container" style={{ padding: '10rem 0', textAlign: 'center' }}>Loading product...</div>;
-  if (error || !product) return <div className="container" style={{ padding: '10rem 0', textAlign: 'center' }}>{error || 'Product not found'}</div>;
+  if (loading) return <div className="container py-40 text-center">Loading product...</div>;
+  if (error || !product) return <div className="container py-40 text-center">{error || 'Product not found'}</div>;
 
   return (
     <div className="product-detail-page">
@@ -111,85 +112,97 @@ const ProductDetailPage = () => {
 
             <p className="short-desc">{product.description}</p>
 
-            <div className="stock-status-container">
+            <div className="stock-status-container mb-6">
               {((selectedWeight ? selectedWeight.stock : product.stock) > 0) ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span className="stock-pill in-stock">
-                      <ShieldCheck size={14} /> In Stock
-                    </span>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                      {(selectedWeight ? selectedWeight.stock : product.stock)} items available for this variant
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="success" className="px-3 py-1 text-xs">
+                      <ShieldCheck size={14} className="mr-1" /> In Stock
+                    </Badge>
+                    <span className="text-sm text-slate-500 font-medium">
+                      {(selectedWeight ? selectedWeight.stock : product.stock)} items available
                     </span>
                   </div>
                   {(selectedWeight ? selectedWeight.stock : product.stock) < 10 && (
-                    <p style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600, margin: 0 }}>
+                    <p className="text-xs text-red-600 font-bold animate-pulse">
                       ⚠️ Hurry! Only a few left in stock.
                     </p>
                   )}
                 </div>
               ) : (
-                <span className="stock-pill out-of-stock">
+                <Badge variant="error" className="px-3 py-1 text-xs uppercase">
                    Out of Stock
-                </span>
+                </Badge>
               )}
             </div>
 
             {product.weight_variants && product.weight_variants.length > 0 ? (
-              <div className="variant-section">
-                <h3>Select Quantity / Weight:</h3>
-                <div className="weight-options">
+              <div className="variant-section mb-8">
+                <h3 className="text-sm font-bold text-slate-400 uppercase mb-4">Select Weight:</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {product.weight_variants.map(variant => {
                     const cartItem = cart.find(item => item.id === product.id && (item.selectedWeight?.label === variant.label || item.selectedWeight === variant.label));
                     const inCartCount = cartItem?.quantity || 0;
+                    const isActive = selectedWeight?.id === variant.id;
 
                     return (
                       <button
                         key={variant.id}
-                        className={`weight-btn ${selectedWeight?.id === variant.id ? 'active' : ''} ${variant.stock <= 0 ? 'disabled' : ''}`}
+                        className={`relative p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${isActive ? 'border-primary bg-emerald-50' : 'border-slate-100 hover:border-slate-300'} ${variant.stock <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer'}`}
                         onClick={() => variant.stock > 0 && setSelectedWeight(variant)}
                         disabled={variant.stock <= 0}
                       >
                         {inCartCount > 0 && (
-                          <span className="in-cart-badge">{inCartCount} in cart</span>
+                          <Badge variant="info" className="absolute -top-2 -right-2 scale-75 px-2">
+                            {inCartCount} in cart
+                          </Badge>
                         )}
-                        <span className="weight-label">{variant.label}</span>
-                        <span className="weight-price">PKR {Number(variant.price).toLocaleString()}</span>
+                        <span className={`text-sm font-bold ${isActive ? 'text-primary' : 'text-slate-700'}`}>{variant.label}</span>
+                        <span className="text-xs text-slate-500">PKR {Number(variant.price).toLocaleString()}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
             ) : (
-              <div className="variant-section no-variants">
-                <p>Standard weight applies. Check stock below.</p>
+              <div className="variant-section no-variants mb-8">
+                <p className="text-sm text-slate-500 italic">Standard weight applies. Check stock below.</p>
               </div>
             )}
 
-            <div className="purchase-section">
-              <div className="quantity-control">
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}>
-                  <Minus size={18} />
-                </button>
-                <span>{quantity}</span>
-                <button 
+            <div className="purchase-section flex flex-wrap gap-4 items-center mb-8">
+              <div className="quantity-control flex items-center bg-slate-100 rounded-xl p-1">
+                <Button 
+                  variant="admin-ghost" 
+                  size="sm" 
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))} 
+                  disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
+                  className="bg-white shadow-sm h-10 w-10 p-0"
+                  icon={Minus}
+                />
+                <span className="w-12 text-center font-bold text-slate-800">{quantity}</span>
+                <Button 
+                  variant="admin-ghost" 
+                  size="sm" 
                   onClick={() => setQuantity(prev => {
                     const max = selectedWeight ? selectedWeight.stock : product.stock;
                     return prev < max ? prev + 1 : prev;
                   })}
                   disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
-                >
-                  <Plus size={18} />
-                </button>
+                  className="bg-white shadow-sm h-10 w-10 p-0"
+                  icon={Plus}
+                />
               </div>
-              <button
-                className={`add-to-cart-btn ${(selectedWeight ? selectedWeight.stock : product.stock) <= 0 ? 'out-of-stock' : ''}`}
+              <Button
+                variant="primary"
+                size="lg"
+                className="flex-1 min-w-[200px] h-12 text-lg"
+                icon={ShoppingCart}
                 onClick={() => addToCart(product, quantity, selectedWeight)}
                 disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
               >
-                <ShoppingCart size={20} /> 
                 {(selectedWeight ? selectedWeight.stock : product.stock) > 0 ? 'Add to Cart' : 'Out of Stock'}
-              </button>
+              </Button>
             </div>
 
             <div className="benefit-grid">
@@ -244,7 +257,7 @@ const ProductDetailPage = () => {
           </section>
         )}
 
-        <style>{productDetailStyles}</style>
+
       </div>
     </div>
   );

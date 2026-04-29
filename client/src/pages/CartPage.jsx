@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { Trash2, Plus, Minus, ArrowLeft, ShoppingBag, ArrowRight, ShieldCheck, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cartStyles } from '../shared/style';
+import { Button, Card, Input, Badge } from '../components/ui';
+
 import { validateCoupon } from '../api/coupons';
 
 const CartPage = () => {
@@ -43,13 +44,15 @@ const CartPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="empty-content"
         >
-          <ShoppingBag size={80} strokeWidth={1} />
-          <h2>Your cart is empty</h2>
-          <p>Looks like you haven't added anything to your cart yet.</p>
-          <Link to="/shop" className="btn btn-primary">Start Shopping</Link>
+          <ShoppingBag size={80} strokeWidth={1} className="text-slate-300 mb-4" />
+          <h2 className="text-3xl font-bold text-slate-800 mb-2">Your cart is empty</h2>
+          <p className="text-slate-500 mb-8 max-w-sm mx-auto">Looks like you haven't added anything to your cart yet. Let's find something delicious for you!</p>
+          <Button as={Link} to="/shop" variant="primary" size="lg" icon={ArrowRight}>
+            Start Shopping
+          </Button>
         </motion.div>
 
-        <style>{cartStyles}</style>
+
       </div>
     );
   }
@@ -119,64 +122,84 @@ const CartPage = () => {
           </div>
 
           {/* Order Summary */}
-          <aside className="order-summary">
-            <h3>Order Summary</h3>
-            <div className="summary-details">
-              <div className="summary-row">
-                <span>Subtotal</span>
-                <span>PKR {subtotal.toLocaleString()}</span>
-              </div>
-              <div className="summary-row">
-                <span>Shipping</span>
-                <span>{shipping === 0 ? 'FREE' : `PKR ${shipping.toLocaleString()}`}</span>
-              </div>
-              {shipping > 0 && (
-                <p className="shipping-note">Free shipping on orders over PKR 2,000!</p>
-              )}
-
-              {discount > 0 && (
-                <div className="summary-row discount">
-                  <span><Tag size={14} /> Discount</span>
-                  <span style={{ color: '#059669' }}>-PKR {discount.toLocaleString()}</span>
+          <aside className="order-summary h-fit">
+            <Card className="bg-slate-50/50 border-slate-200 p-6">
+              <h3 className="text-xl font-bold text-slate-800 mb-6">Order Summary</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between text-slate-600 font-medium">
+                  <span>Subtotal</span>
+                  <span>PKR {subtotal.toLocaleString()}</span>
                 </div>
-              )}
+                <div className="flex justify-between text-slate-600 font-medium">
+                  <span>Shipping</span>
+                  <span className={shipping === 0 ? 'text-emerald-600 font-bold' : ''}>
+                    {shipping === 0 ? 'FREE' : `PKR ${shipping.toLocaleString()}`}
+                  </span>
+                </div>
+                {shipping > 0 && (
+                  <p className="text-[11px] text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold">
+                    Free shipping on orders over PKR 2,000!
+                  </p>
+                )}
 
-              <div className="promo-code">
-                <input
-                  type="text"
-                  placeholder="Promo Code"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
-                />
-                <button onClick={handleApplyPromo} disabled={promoLoading}>
-                  {promoLoading ? '...' : 'Apply'}
-                </button>
+                {discount > 0 && (
+                  <div className="flex justify-between items-center bg-emerald-50 p-2 rounded-lg border border-dashed border-emerald-200">
+                    <span className="text-emerald-700 text-sm font-bold flex items-center gap-1">
+                      <Tag size={14} /> Discount
+                    </span>
+                    <span className="text-emerald-700 font-bold">-PKR {discount.toLocaleString()}</span>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Promo Code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
+                      containerClassName="mb-0 flex-1"
+                      className="h-10"
+                    />
+                    <Button 
+                      variant="admin-primary" 
+                      size="sm" 
+                      onClick={handleApplyPromo} 
+                      loading={promoLoading}
+                      className="h-10"
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  {promoMsg && (
+                    <p className={`text-xs mt-2 font-bold ${promoMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {promoMsg.text}
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                  <span className="text-lg font-bold text-slate-800">Total</span>
+                  <span className="text-2xl font-bold text-primary">PKR {total.toLocaleString()}</span>
+                </div>
+
+                <Button 
+                  as={Link} 
+                  to="/checkout" 
+                  variant="primary" 
+                  size="lg" 
+                  className="w-full py-4 mt-2"
+                  icon={ArrowRight}
+                >
+                  Proceed to Checkout
+                </Button>
+
+                <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-medium pt-2">
+                  <ShieldCheck size={16} className="text-emerald-500" />
+                  <span>Secure Checkout Guaranteed</span>
+                </div>
               </div>
-              {promoMsg && (
-                <p style={{
-                  fontSize: '0.85rem',
-                  marginTop: '-0.5rem',
-                  color: promoMsg.type === 'success' ? '#059669' : '#dc2626'
-                }}>
-                  {promoMsg.text}
-                </p>
-              )}
-
-              <div className="summary-total">
-                <span>Total</span>
-                <span>PKR {total.toLocaleString()}</span>
-              </div>
-
-              <Link to="/checkout" className="checkout-btn">
-                Proceed to Checkout
-              </Link>
-
-              <div className="secure-checkout">
-                <ShieldCheck size={16} />
-                <span>Secure Checkout Guaranteed</span>
-              </div>
-            </div>
+            </Card>
           </aside>
         </div>
       </div>

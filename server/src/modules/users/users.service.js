@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const prisma = require("../../config/prisma");
 const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
+const { auth: firebaseAuth } = require("../../config/firebase");
 
 async function getProfile(userId) {
   const user = await prisma.users.findUnique({
@@ -16,8 +17,10 @@ async function getProfile(userId) {
       is_active: true,
       created_at: true,
       addresses: {
-        where: { is_default: true },
-        take: 1
+        orderBy: [
+          { is_default: "desc" },
+          { created_at: "desc" }
+        ]
       }
     }
   });
@@ -44,20 +47,27 @@ async function updateProfile(userId, payload) {
     return getProfile(userId);
   }
 
-  await prisma.users.update({
-    where: { id: userId },
-    data: {
-      ...payload,
-      updated_at: new Date()
-    }
-  });
+  // Only allow safe fields to be updated
+  const allowedFields = {};
+  if (payload.name !== undefined) allowedFields.name = payload.name;
+  if (payload.phone !== undefined) allowedFields.phone = payload.phone;
+
+  if (Object.keys(allowedFields).length > 0) {
+    await prisma.users.update({
+      where: { id: userId },
+      data: {
+        ...allowedFields,
+        updated_at: new Date()
+      }
+    });
+  }
   return getProfile(userId);
 }
 
 async function changePassword(userId, currentPassword, newPassword) {
   const user = await prisma.users.findUnique({
     where: { id: userId },
-    select: { password_hash: true }
+    select: { password_hash: true, firebase_uid: true }
   });
   if (!user) {
     throw new ApiError(404, "User not found", "USER_NOT_FOUND");
@@ -77,6 +87,15 @@ async function changePassword(userId, currentPassword, newPassword) {
       updated_at: new Date()
     }
   });
+
+  // Also update Firebase password to keep both in sync
+  if (firebaseAuth && user.firebase_uid) {
+    try {
+      await firebaseAuth.updateUser(user.firebase_uid, { password: newPassword });
+    } catch (err) {
+      console.error("Failed to update Firebase password:", err.message);
+    }
+  }
 
   if (cache) {
     await cache.del(`refresh:${userId}`);

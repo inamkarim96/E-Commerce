@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, Camera, MessageSquare, Mail, Phone, MapPin, Leaf } from 'lucide-react';
-import { footerStyles } from '../shared/style';
+
 
 const Footer = () => {
   return (
@@ -73,7 +73,7 @@ const Footer = () => {
         </div>
       </div>
 
-      <style>{footerStyles}</style>
+
     </footer>
   );
 };

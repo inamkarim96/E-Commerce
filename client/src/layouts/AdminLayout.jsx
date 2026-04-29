@@ -1,28 +1,60 @@
 import React from 'react';
 import { NavLink, Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard as RxDashboard, Package as FiPackage, ShoppingBag as FiShoppingBag, Users as FiUsers, LogOut } from 'lucide-react';
+import { 
+  LayoutDashboard as RxDashboard, 
+  Package, 
+  Package as FiPackage, 
+  ShoppingBag as FiShoppingBag, 
+  Users as FiUsers, 
+  LogOut, 
+  FolderOpen, 
+  Settings, 
+  ArrowLeft,
+  Menu,
+  X
+} from 'lucide-react';
+import { Button } from '../components/ui';
 
-const AdminLayout = () => {
+const AdminLayout = ({ children }) => {
   const { logout } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f9fafb' }}>
+    <div className={`admin-layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Mobile Header */}
+      <header className="admin-mobile-header">
+        <Link to="/" className="admin-sidebar-logo">
+          <Package size={24} /> NaturaDry
+        </Link>
+        <button onClick={toggleSidebar} className="mobile-toggle">
+          {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </header>
+
+      {/* Overlay for mobile */}
+      {isSidebarOpen && (
+        <div className="admin-sidebar-overlay" onClick={toggleSidebar}></div>
+      )}
+
       {/* Sidebar */}
-      <div style={{ width: '250px', backgroundColor: '#1e3d1a', color: 'white', display: 'flex', flexDirection: 'column' }}>
-        {/* Logo */}
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.25rem', fontWeight: 'bold', color: 'white', textDecoration: 'none' }}>
-            🌿 NaturaDry
+      <aside className={`admin-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        {/* Logo Section */}
+        <div className="admin-sidebar-header">
+          <Link to="/" className="admin-sidebar-logo">
+            <Package size={28} /> NaturaDry
           </Link>
-          <div style={{ color: '#86efac', fontSize: '0.875rem', marginTop: '0.25rem' }}>Admin Panel</div>
+          <div className="text-emerald-300 text-xs mt-1">Admin Panel</div>
         </div>
 
-        {/* Nav Links */}
-        <nav style={{ flex: 1, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {/* Navigation */}
+        <nav className="admin-nav">
           {[
             { to: '/admin', icon: RxDashboard, label: 'Dashboard', end: true },
             { to: '/admin/products', icon: FiPackage, label: 'Products' },
+            { to: '/admin/categories', icon: FolderOpen, label: 'Categories' },
             { to: '/admin/orders', icon: FiShoppingBag, label: 'Orders' },
             { to: '/admin/users', icon: FiUsers, label: 'Users' }
           ].map(({ to, icon: Icon, label, end }) => (
@@ -30,42 +62,37 @@ const AdminLayout = () => {
               key={to}
               to={to}
               end={end}
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: isActive ? 'white' : '#bbf7d0',
-                backgroundColor: isActive ? '#2d5a27' : 'transparent',
-                borderRadius: '0.5rem',
-                textDecoration: 'none',
-                transition: 'all 0.2s'
-              })}
+              onClick={() => setIsSidebarOpen(false)}
+              className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
             >
               <Icon size={20} />
               {label}
             </NavLink>
           ))}
+          <NavLink
+            to="/admin/settings"
+            onClick={() => setIsSidebarOpen(false)}
+            className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+          >
+            <Settings size={20} /> Settings
+          </NavLink>
         </nav>
 
-        {/* Bottom: View Site + Logout */}
-        <div style={{ padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: '500', color: '#bbf7d0', textDecoration: 'none', borderRadius: '0.5rem' }}>
-            View Website
+        {/* Footer actions */}
+        <div className="admin-sidebar-footer">
+          <Link to="/" className="admin-nav-link text-emerald-200">
+            <ArrowLeft size={20} /> Back to Shop
           </Link>
-          <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', fontSize: '0.875rem', fontWeight: '500', color: '#fca5a5', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', borderRadius: '0.5rem', width: '100%', textAlign: 'left' }}>
-            <LogOut size={20} />
-            Logout
+          <button onClick={logout} className="admin-nav-link text-red-300 bg-transparent border-none cursor-pointer w-full text-left">
+            <LogOut size={20} /> Logout
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Main content area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <main style={{ flex: 1, overflowX: 'hidden', overflowY: 'auto', padding: '2rem' }}>
-          <Outlet />
+      {/* Main Content Area */}
+      <div className="admin-main-wrapper">
+        <main className="admin-main-content">
+          {children || <Outlet />}
         </main>
       </div>
     </div>

@@ -3,12 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, ArrowRight, Phone, MapPin, Home, Key } from 'lucide-react';
-import { loginStyles } from '../shared/style';
+import { Button, Input, Card, Badge } from '../components/ui';
+
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPhoneNumber,
-  signInWithCustomToken,
   sendEmailVerification,
   updateProfile,
   RecaptchaVerifier
@@ -50,64 +50,33 @@ const CustomSelect = ({ options, value, onChange, placeholder, style, hideSelect
   });
 
   return (
-    <div ref={ref} style={{ position: 'relative', height: '100%', ...style }}>
+    <div ref={ref} className="custom-select-container" style={style}>
       <div
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          height: '100%',
-          cursor: 'pointer',
-          padding: '0 0.5rem',
-          gap: '0.25rem',
-          color: 'var(--text)'
-        }}
+        className="custom-select-trigger"
       >
         {selectedOption ? (
           <>
-            <span className={`fi fi-${selectedOption.cca2.toLowerCase()}`} style={{ fontSize: '20px', borderRadius: '2px' }} />
+            <span className={`fi fi-${selectedOption.cca2.toLowerCase()} flag-icon-sm`} />
             {!hideSelectedLabel && <span>{selectedOption.label}</span>}
           </>
         ) : placeholder}
       </div>
 
       {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          zIndex: 50,
-          background: 'white',
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          maxHeight: '260px',
-          minWidth: '200px',
-          overflowY: 'auto',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{ padding: '0.5rem', position: 'sticky', top: 0, background: 'white', borderBottom: '1px solid #e2e8f0', zIndex: 10 }}>
+        <div className="custom-select-dropdown">
+          <div className="custom-select-search">
             <input
               ref={inputRef}
               type="text"
               placeholder="Search..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #cbd5e1',
-                borderRadius: '4px',
-                outline: 'none',
-                fontSize: '0.9rem',
-                background: 'white',
-                color: 'black'
-              }}
+              style={{ color: 'black' }}
             />
           </div>
           {filteredOptions.length === 0 ? (
-            <div style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.9rem' }}>No results found</div>
+            <div className="no-results-msg">No results found</div>
           ) : (
             filteredOptions.map(opt => (
               <div
@@ -116,20 +85,10 @@ const CustomSelect = ({ options, value, onChange, placeholder, style, hideSelect
                   onChange(opt.value);
                   setIsOpen(false);
                 }}
-                style={{
-                  padding: '0.75rem 1rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  color: '#0f172a',
-                  fontSize: '0.9rem'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                className="custom-select-option"
               >
-                <span className={`fi fi-${opt.cca2.toLowerCase()}`} style={{ fontSize: '18px', borderRadius: '2px' }} />
-                <span style={{ whiteSpace: 'nowrap' }}>{opt.label}</span>
+                <span className={`fi fi-${opt.cca2.toLowerCase()} flag-icon-sm`} style={{ fontSize: '18px' }} />
+                <span>{opt.label}</span>
               </div>
             ))
           )}
@@ -249,12 +208,7 @@ const LoginPage = () => {
         if (loginMethod === 'email') {
           const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase().trim();
           if (formData.email.toLowerCase().trim() === adminEmail) {
-            const result = await login(formData.email, formData.password);
-            if (result?.status === 'VERIFICATION_REQUIRED') {
-              const userCredential = await signInWithCustomToken(auth, result.customToken);
-              await sendEmailVerification(userCredential.user);
-              startVerificationPolling(result.email);
-            }
+            await login(formData.email, formData.password);
             // Redirection is handled by useEffect
           } else {
             const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
@@ -294,7 +248,8 @@ const LoginPage = () => {
             phone: `${formData.phoneCode}${formData.phone}`,
             country: formData.country,
             city: formData.city,
-            address: formData.address
+            address: formData.address,
+            password: formData.password
           };
 
           await handleFirebaseSync(userCredential.user, profileData);
@@ -366,7 +321,7 @@ const LoginPage = () => {
           <div id="recaptcha-container"></div>
 
           {error && (
-            <div style={{ padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1.5rem', background: '#fee2e2', color: '#b91c1c', fontSize: '0.9rem' }}>
+            <div className="bg-red-50 border border-red-100 text-red-700 p-4 rounded-xl mb-6 text-sm font-medium">
               {error}
             </div>
           )}
@@ -380,57 +335,41 @@ const LoginPage = () => {
               } catch (err) {
                 setError('Invalid code');
               }
-            }} className="login-form">
-              <div className="form-group">
-                <label>Phone Verification Code</label>
-                <div className="input-wrapper">
-                  <Key size={18} />
-                  <input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="Enter 6-digit code"
-                    required
-                    style={{ letterSpacing: otp ? '0.5rem' : 'normal', fontWeight: 'bold' }}
-                  />
-                </div>
-              </div>
-              <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Verifying...' : 'Verify & Continue'} <ArrowRight size={18} />
-              </button>
+            }} className="login-form space-y-6">
+              <Input
+                label="Phone Verification Code"
+                icon={Key}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="text-center tracking-widest text-xl font-bold"
+              />
+              <Button type="submit" variant="primary" loading={loading} className="w-full" icon={ArrowRight}>
+                {loading ? 'Verifying...' : 'Verify & Continue'}
+              </Button>
             </form>
           ) : isVerifyingEmail ? (
-            <div className="login-form" style={{ textAlign: 'center' }}>
-              <div style={{ marginBottom: '2rem' }}>
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  background: '#f0fdf4',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 1.5rem'
-                }}>
-                  <Mail style={{ color: '#16a34a' }} size={30} />
+            <div className="login-form verification-view">
+              <div className="verification-header">
+                <div className="verification-icon">
+                  <Mail className="text-green-600" size={30} />
                 </div>
-                <p style={{ color: '#6b7280', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                <p className="verification-text">
                   Waiting for you to click the link in your email...
                 </p>
               </div>
 
               <button
                 type="button"
-                className="submit-btn"
+                className="submit-btn secondary"
                 onClick={handleResendEmail}
-                style={{ background: '#f9fafb', color: '#374151', border: '1px solid #e5e7eb' }}
               >
                 Resend Email
               </button>
 
               <button
                 type="button"
-                style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: '0.85rem', cursor: 'pointer', marginTop: '1.5rem', display: 'block', width: '100%' }}
+                className="back-to-login-btn"
                 onClick={() => { setIsVerifyingEmail(false); auth.signOut(); }}
               >
                 ← Back to login
@@ -439,132 +378,151 @@ const LoginPage = () => {
           ) : (
             <form onSubmit={handleSubmit} className="login-form">
               {isLogin && (
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
+                <div className="auth-method-tabs flex gap-2 p-1 bg-slate-100 rounded-xl mb-6">
                   <button
                     type="button"
                     onClick={() => setLoginMethod('email')}
-                    style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', background: loginMethod === 'email' ? 'white' : 'transparent', fontWeight: loginMethod === 'email' ? '600' : '400', boxShadow: loginMethod === 'email' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${loginMethod === 'email' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     Email
                   </button>
                   <button
                     type="button"
                     onClick={() => setLoginMethod('phone')}
-                    style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', background: loginMethod === 'phone' ? 'white' : 'transparent', fontWeight: loginMethod === 'phone' ? '600' : '400', boxShadow: loginMethod === 'phone' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${loginMethod === 'phone' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     Phone
                   </button>
                 </div>
               )}
               {!isLogin && (
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>First Name</label>
-                    <div className="input-wrapper">
-                      <User size={18} />
-                      <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="first" required />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Last Name</label>
-                    <div className="input-wrapper">
-                      <User size={18} />
-                      <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="last" required />
-                    </div>
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="First Name"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    placeholder="Jane"
+                    icon={User}
+                    required
+                  />
+                  <Input
+                    label="Last Name"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    placeholder="Doe"
+                    icon={User}
+                    required
+                  />
                 </div>
               )}
 
               {!isLogin && (
                 <div className="form-group">
                   <label>Phone Number</label>
-                  <div className="input-wrapper" style={{ paddingLeft: '0.5rem' }}>
+                  <div className="input-wrapper pl-2">
                     <CustomSelect
                       options={countries.map(c => ({ value: c.code, label: c.code, cca2: c.cca2, searchKey: `${c.name} ${c.code}` }))}
                       value={formData.phoneCode}
                       onChange={(val) => handleChange({ target: { name: 'phoneCode', value: val } })}
                       hideSelectedLabel={true}
                     />
-                    <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 0.5rem' }}></div>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="300 1234567" required style={{ paddingLeft: '1rem' }} />
+                    <div className="v-divider"></div>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="300 1234567" required className="pl-4" />
                   </div>
                 </div>
               )}
 
               {(loginMethod === 'phone' && isLogin) ? (
-                <div className="form-group">
-                  <label>Phone Number</label>
-                  <div className="input-wrapper" style={{ paddingLeft: '0.5rem' }}>
+                <div className="admin-form-group">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                  <div className="flex gap-0 border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-emerald-100 focus-within:border-primary transition-all">
                     <CustomSelect
                       options={countries.map(c => ({ value: c.code, label: c.code, cca2: c.cca2, searchKey: `${c.name} ${c.code}` }))}
                       value={formData.phoneCode}
                       onChange={(val) => handleChange({ target: { name: 'phoneCode', value: val } })}
                       hideSelectedLabel={true}
+                      style={{ border: 'none', background: 'transparent' }}
                     />
-                    <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 0.5rem' }}></div>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder={phonePlaceholder} required style={{ paddingLeft: '1rem' }} />
+                    <div className="w-[1px] bg-slate-200 my-2"></div>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder={phonePlaceholder} required className="flex-1 px-4 py-3 border-none focus:ring-0 text-sm" />
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="form-group">
-                    <label>Email Address</label>
-                    <div className="input-wrapper">
-                      <Mail size={18} />
-                      <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" required />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Password</label>
-                    <div className="input-wrapper">
-                      <Lock size={18} />
-                      <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" required />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {!isLogin && (
-                <>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Country</label>
-                      <div className="input-wrapper">
-                        <MapPin size={18} />
-                        <input type="text" name="country" value={formData.country} onChange={handleChange} placeholder="Pakistan" required />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label>City</label>
-                      <div className="input-wrapper">
-                        <MapPin size={18} />
-                        <input type="text" name="city" value={formData.city} onChange={handleChange} placeholder="Karachi" required />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Home Address</label>
-                    <div className="input-wrapper">
-                      <MapPin size={18} />
-                      <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="123 Street Name" required />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {!isLogin && (
-                <div className="form-group">
-                  <label>Re-enter Password</label>
-                  <div className="input-wrapper">
-                    <Lock size={18} />
-                    <input type="password" name="rePassword" value={formData.rePassword} onChange={handleChange} placeholder="••••••••" required />
-                  </div>
+                <div className="space-y-4">
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="jane@example.com"
+                    icon={Mail}
+                    required
+                  />
+                  <Input
+                    label="Password"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    icon={Lock}
+                    required
+                  />
                 </div>
               )}
 
-              <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Register'} <ArrowRight size={18} />
-              </button>
+              {!isLogin && (
+                <div className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Country"
+                      name="country"
+                      value={formData.country}
+                      onChange={handleChange}
+                      placeholder="Pakistan"
+                      icon={MapPin}
+                      required
+                    />
+                    <Input
+                      label="City"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      placeholder="Karachi"
+                      icon={MapPin}
+                      required
+                    />
+                  </div>
+                  <Input
+                    label="Home Address"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="123 Street Name"
+                    icon={MapPin}
+                    required
+                  />
+                  <Input
+                    label="Re-enter Password"
+                    type="password"
+                    name="rePassword"
+                    value={formData.rePassword}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    icon={Lock}
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="pt-4">
+                <Button type="submit" variant="primary" loading={loading} className="w-full py-4 text-lg" icon={ArrowRight}>
+                  {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Register'}
+                </Button>
+              </div>
             </form>
           )}
 
@@ -581,7 +539,7 @@ const LoginPage = () => {
         </motion.div>
       </div>
 
-      <style>{loginStyles}</style>
+
     </div>
   );
 };

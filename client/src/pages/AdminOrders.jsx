@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Eye, Filter, X } from 'lucide-react';
-import { adminManagementStyles } from '../shared/style';
+import { Search, Eye, Filter } from 'lucide-react';
+import { Button, Badge, Input, Modal, Select, Card } from '../components/ui';
+
 import * as adminApi from '../api/admin';
 import { toast } from 'react-hot-toast';
 
@@ -104,39 +105,45 @@ const AdminOrders = () => {
         </div>
       </div>
 
-      <div className="toolbar" style={{ display: 'flex', gap: '1rem', background: 'white', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1, minWidth: '200px' }}>
-          <Search size={18} color="#666" />
-          <input 
-            type="text" 
-            placeholder="Search by name or email..." 
-            value={filters.search} 
-            onChange={e => setFilters(p => ({...p, search: e.target.value}))} 
-            style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', width: '100%' }} 
-          />
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Status:</label>
-          <select value={filters.status} onChange={e => setFilters(p => ({...p, status: e.target.value}))} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}>
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>From:</label>
-          <input type="date" value={filters.date_from} onChange={e => setFilters(p => ({...p, date_from: e.target.value}))} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>To:</label>
-          <input type="date" value={filters.date_to} onChange={e => setFilters(p => ({...p, date_to: e.target.value}))} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-        </div>
-        <button onClick={fetchOrders} style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+      <div className="admin-toolbar flex-wrap">
+        <Input
+          placeholder="Search by name or email..."
+          value={filters.search}
+          onChange={e => setFilters(p => ({...p, search: e.target.value}))}
+          icon={Search}
+          containerClassName="mb-0 flex-1 min-w-[200px]"
+        />
+        <Select
+          label="Status"
+          value={filters.status}
+          onChange={e => setFilters(p => ({...p, status: e.target.value}))}
+          options={[
+            { value: '', label: 'All' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'processing', label: 'Processing' },
+            { value: 'shipped', label: 'Shipped' },
+            { value: 'delivered', label: 'Delivered' },
+            { value: 'cancelled', label: 'Cancelled' }
+          ]}
+          containerClassName="mb-0"
+        />
+        <Input
+          label="From"
+          type="date"
+          value={filters.date_from}
+          onChange={e => setFilters(p => ({...p, date_from: e.target.value}))}
+          containerClassName="mb-0"
+        />
+        <Input
+          label="To"
+          type="date"
+          value={filters.date_to}
+          onChange={e => setFilters(p => ({...p, date_to: e.target.value}))}
+          containerClassName="mb-0"
+        />
+        <Button variant="admin-primary" onClick={fetchOrders} className="mt-auto">
           Apply Filters
-        </button>
+        </Button>
       </div>
 
       <div className="table-container">
@@ -166,26 +173,35 @@ const AdminOrders = () => {
                   <td>{o.items_count || 0}</td>
                   <td>PKR {Number(o.total).toLocaleString()}</td>
                   <td>
-                    <span className={`status-pill ${o.status}`} style={{ textTransform: 'capitalize' }}>
-                      {o.status}
-                    </span>
+                    <Badge variant={
+                      o.status === 'delivered' ? 'success' : 
+                      o.status === 'cancelled' ? 'error' : 
+                      o.status === 'pending' ? 'warning' : 'info'
+                    }>
+                      {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
+                    </Badge>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <button onClick={() => handleViewOrder(o.id)} title="View" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
-                        <Eye size={18} />
-                      </button>
-                      <select 
-                        value={o.status} 
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="admin-ghost"
+                        size="sm"
+                        icon={Eye}
+                        onClick={() => handleViewOrder(o.id)}
+                        title="View Order"
+                      />
+                      <Select
+                        value={o.status}
                         onChange={(e) => handleStatusUpdate(o.id, e.target.value)}
-                        style={{ padding: '0.2rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="processing">Processing</option>
-                        <option value="shipped">Shipped</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
+                        options={[
+                          { value: 'pending', label: 'Pending' },
+                          { value: 'processing', label: 'Processing' },
+                          { value: 'shipped', label: 'Shipped' },
+                          { value: 'delivered', label: 'Delivered' },
+                          { value: 'cancelled', label: 'Cancelled' }
+                        ]}
+                        containerClassName="mb-0 min-w-[130px]"
+                      />
                     </div>
                   </td>
                 </tr>
@@ -195,85 +211,107 @@ const AdminOrders = () => {
         )}
       </div>
 
-      {selectedOrder && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="modal-content" style={{ background: 'white', padding: '2rem', borderRadius: '8px', width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h2>Order #{selectedOrder.id.substring(0, 8)}</h2>
-              <button onClick={() => setSelectedOrder(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><X size={24} /></button>
+      <Modal
+        isOpen={!!selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+        title={`Order #${selectedOrder?.id.substring(0, 8)}`}
+        size="2xl"
+      >
+        <div className="space-y-6">
+          <Card className="bg-slate-50 border-none">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-slate-500 mb-1">Customer</p>
+                <p className="font-bold">{selectedOrder?.user_name}</p>
+                <p className="text-slate-600">{selectedOrder?.user_email}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 mb-1">Status</p>
+                <Badge variant={
+                  selectedOrder?.status === 'delivered' ? 'success' : 
+                  selectedOrder?.status === 'cancelled' ? 'error' : 'info'
+                }>
+                  {selectedOrder?.status}
+                </Badge>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-slate-500 mb-1">Shipping Address</p>
+                <p className="font-medium text-slate-700 leading-relaxed">
+                  {typeof selectedOrder?.shipping_address === 'object' 
+                    ? `${selectedOrder.shipping_address.address}, ${selectedOrder.shipping_address.city}, ${selectedOrder.shipping_address.zip_code}, ${selectedOrder.shipping_address.country}`
+                    : selectedOrder?.shipping_address}
+                </p>
+              </div>
             </div>
-            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
-              <p><strong>Customer:</strong> {selectedOrder.user_name} ({selectedOrder.user_email})</p>
-              <p><strong>Address:</strong> {typeof selectedOrder.shipping_address === 'object' 
-                ? `${selectedOrder.shipping_address.address}, ${selectedOrder.shipping_address.city}, ${selectedOrder.shipping_address.zip_code}, ${selectedOrder.shipping_address.country}`
-                : selectedOrder.shipping_address}</p>
-              <p><strong>Status:</strong> {selectedOrder.status}</p>
-            </div>
-            <h3>Items</h3>
-            <div style={{ marginBottom: '1.5rem' }}>
-              {selectedOrder.items?.map(item => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
-                  <span>{item.quantity}x {item.product_name} ({item.variant_label})</span>
-                  <span>PKR {Number(item.subtotal).toLocaleString()}</span>
+          </Card>
+
+          <div>
+            <h3 className="text-lg font-bold mb-3">Order Items</h3>
+            <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
+              {selectedOrder?.items?.map(item => (
+                <div key={item.id} className="flex justify-between p-3 bg-white">
+                  <div>
+                    <p className="font-semibold">{item.product_name}</p>
+                    <p className="text-xs text-slate-500">{item.variant_label} x {item.quantity}</p>
+                  </div>
+                  <span className="font-bold text-slate-700">PKR {Number(item.subtotal).toLocaleString()}</span>
                 </div>
               ))}
             </div>
-            <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Subtotal:</span><span>PKR {Number(selectedOrder.subtotal).toLocaleString()}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Shipping:</span><span>PKR {Number(selectedOrder.shipping_fee).toLocaleString()}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Discount:</span><span>- PKR {Number(selectedOrder.discount).toLocaleString()}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #ccc' }}><span>Total:</span><span>PKR {Number(selectedOrder.total).toLocaleString()}</span></div>
-            </div>
-
-            <div style={{ marginTop: '1.5rem' }}>
-              <h3>Admin Notes</h3>
-              <textarea 
-                value={adminNotes} 
-                onChange={(e) => setAdminNotes(e.target.value)}
-                placeholder="Add internal notes about this order..."
-                style={{ width: '100%', height: '80px', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', marginTop: '0.5rem', fontFamily: 'inherit' }}
-              />
-              <button 
-                onClick={handleUpdateNotes} 
-                disabled={notesLoading}
-                style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                {notesLoading ? 'Saving...' : 'Save Notes'}
-              </button>
-            </div>
-
-            {selectedOrder.history && selectedOrder.history.length > 0 && (
-              <div style={{ marginTop: '1.5rem' }}>
-                <h3>Order History</h3>
-                <div style={{ marginTop: '0.5rem', border: '1px solid #eee', borderRadius: '4px', background: '#fafafa' }}>
-                  {selectedOrder.history.map((log) => (
-                    <div key={log.id} style={{ padding: '0.75rem', borderBottom: '1px solid #eee', fontSize: '0.85rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                        <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
-                          {log.status_from ? `${log.status_from} → ` : ''}{log.status_to}
-                        </span>
-                        <span style={{ color: '#666' }}>
-                          {new Date(log.created_at).toLocaleString()}
-                        </span>
-                      </div>
-                      <div style={{ color: '#444' }}>
-                        Changed by: {log.changed_by_name || 'System'}
-                      </div>
-                      {log.notes && (
-                        <div style={{ marginTop: '0.25rem', fontStyle: 'italic', color: '#666' }}>
-                          Note: {log.notes}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      )}
 
-      <style>{adminManagementStyles}</style>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-100">
+            <div className="flex justify-between text-sm"><span>Subtotal</span><span>PKR {Number(selectedOrder?.subtotal).toLocaleString()}</span></div>
+            <div className="flex justify-between text-sm"><span>Shipping</span><span>PKR {Number(selectedOrder?.shipping_fee).toLocaleString()}</span></div>
+            <div className="flex justify-between text-sm text-red-600"><span>Discount</span><span>- PKR {Number(selectedOrder?.discount).toLocaleString()}</span></div>
+            <div className="flex justify-between font-bold text-xl mt-4 pt-4 border-t border-slate-200 text-primary">
+              <span>Total</span>
+              <span>PKR {Number(selectedOrder?.total).toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold mb-2">Admin Notes</h3>
+            <textarea 
+              value={adminNotes} 
+              onChange={(e) => setAdminNotes(e.target.value)}
+              placeholder="Internal notes..."
+              className="admin-input w-full h-24 font-sans resize-none mb-2"
+            />
+            <Button 
+              variant="admin-primary" 
+              onClick={handleUpdateNotes} 
+              loading={notesLoading}
+            >
+              Save Notes
+            </Button>
+          </div>
+
+          {selectedOrder?.history && selectedOrder.history.length > 0 && (
+            <div>
+              <h3 className="text-lg font-bold mb-3">Order History</h3>
+              <div className="space-y-3">
+                {selectedOrder.history.map((log) => (
+                  <div key={log.id} className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-sm">
+                    <div className="flex justify-between items-center mb-1">
+                      <Badge variant="info" pill={false} className="text-[10px]">
+                        {log.status_from ? `${log.status_from} → ` : ''}{log.status_to}
+                      </Badge>
+                      <span className="text-slate-400 text-xs font-medium">
+                        {new Date(log.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-slate-600">Changed by: <span className="font-semibold text-slate-800">{log.changed_by_name || 'System'}</span></p>
+                    {log.notes && <p className="mt-2 text-xs italic text-slate-500 bg-white p-2 rounded border border-slate-100">Note: {log.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      
     </div>
   );
 };

@@ -138,10 +138,11 @@ export const AuthProvider = ({ children }) => {
       const response = await authApi.updateProfile(data);
       if (response.success) {
         setUser(prev => {
-          const newUser = { ...prev, ...response.data, accessToken: prev.accessToken };
-          localStorage.setItem('naturadry_user', JSON.stringify(newUser));
-          return newUser;
+          const updatedUser = { ...response.data, accessToken: prev.accessToken };
+          localStorage.setItem('naturadry_user', JSON.stringify(updatedUser));
+          return updatedUser;
         });
+        return response;
       }
     } catch (error) {
       throw error.response?.data?.error || error;

@@ -8,7 +8,8 @@ import {
   MoreVertical
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { adminDashboardStyles } from '../shared/style';
+import { Button, Badge, Card } from '../components/ui';
+
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -69,7 +70,7 @@ const AdminDashboard = () => {
     <div className="admin-dashboard">
       <div className="dashboard-header">
         <h1>Dashboard Overview</h1>
-        <button className="download-btn" onClick={() => window.print()}>Download Report</button>
+        <Button variant="admin-outline" size="sm" onClick={() => window.print()}>Download Report</Button>
       </div>
 
       <div className="stats-grid">
@@ -98,9 +99,9 @@ const AdminDashboard = () => {
           </div>
           <div className="admin-table-container">
             {loading ? (
-              <p style={{ padding: '2rem' }}>Loading recent orders...</p>
+              <p className="state-msg">Loading recent orders...</p>
             ) : recentOrders.length === 0 ? (
-              <p style={{ padding: '2rem' }}>No recent orders.</p>
+              <p className="state-msg">No recent orders.</p>
             ) : (
               <table className="admin-table">
                 <thead>
@@ -120,9 +121,12 @@ const AdminDashboard = () => {
                       <td>{new Date(order.created_at).toLocaleDateString()}</td>
                       <td>PKR {Number(order.total).toLocaleString()}</td>
                       <td>
-                        <span className={`status-pill ${order.status.toLowerCase()}`}>
+                        <Badge variant={
+                          order.status.toLowerCase() === 'delivered' ? 'success' : 
+                          order.status.toLowerCase() === 'cancelled' ? 'error' : 'info'
+                        }>
                           {order.status}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   ))}
@@ -139,9 +143,9 @@ const AdminDashboard = () => {
           </div>
           <div className="alerts-list">
             {loading ? (
-              <p style={{ padding: '2rem' }}>Loading inventory alerts...</p>
+              <p className="state-msg">Loading inventory alerts...</p>
             ) : inventory.length === 0 ? (
-              <p style={{ padding: '2rem', color: '#059669' }}>All products are well stocked!</p>
+              <p className="state-msg text-green-600">All products are well stocked!</p>
             ) : (
               inventory.slice(0, 5).map((item, idx) => (
                 <div key={idx} className="alert-item">
@@ -149,7 +153,15 @@ const AdminDashboard = () => {
                     <strong>{item.product_name} ({item.variant_label})</strong>
                     <span>Only {item.stock} items left in stock</span>
                   </div>
-                  <Link to="/admin/products" className="restock-btn" style={{ textDecoration: 'none', textAlign: 'center' }}>Restock</Link>
+                  <Button 
+                    as={Link} 
+                    to="/admin/products" 
+                    variant="admin-ghost" 
+                    size="sm" 
+                    className="no-underline text-center"
+                  >
+                    Restock
+                  </Button>
                 </div>
               ))
             )}
@@ -157,7 +169,7 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <style>{adminDashboardStyles}</style>
+
     </div>
   );
 };

@@ -19,9 +19,13 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
       const res = await productsApi.getCategories();
       if (res.success) {
         setCategories(res.data?.categories || []);
+        setError(null);
+      } else {
+        setError('Failed to load categories');
       }
     } catch (err) {
       console.error('Failed to fetch categories:', err);
+      setError(err?.response?.data?.error?.message || 'Failed to load categories');
     }
   }, []);
 
@@ -59,6 +63,7 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
     filters,
     setFilters,
     refresh: fetchProducts,
+    refreshCategories: fetchCategories,
     setProducts // Sometimes we need to update state manually after small changes
   };
 };

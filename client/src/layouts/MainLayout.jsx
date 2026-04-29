@@ -1,7 +1,7 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { mainLayoutStyles } from '../shared/style';
+
 
 const MainLayout = ({ children }) => {
   return (
@@ -12,7 +12,7 @@ const MainLayout = ({ children }) => {
       </main>
       <Footer />
       
-      <style>{mainLayoutStyles}</style>
+
     </div>
   );
 };
