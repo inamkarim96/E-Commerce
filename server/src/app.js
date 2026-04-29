@@ -41,7 +41,7 @@ app.use("/payments/webhook/stripe", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(requestLogger);
 
-app.use("/", apiV1Router);
+app.use("/api", apiV1Router);
 
 app.use((req, res) => {
   res.status(404).json({
