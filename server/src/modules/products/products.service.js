@@ -233,9 +233,9 @@ async function searchProducts({ q, page, limit }) {
   };
 }
 
-async function getProductById(id, includeInactive = false) {
-  const row = await prisma.products.findUnique({
-    where: { 
+async function _getProductByIdWithClient(client, id, includeInactive = false) {
+  const row = await client.products.findUnique({
+    where: {
       id,
       ...(includeInactive ? {} : { is_active: true })
     },
@@ -253,6 +253,10 @@ async function getProductById(id, includeInactive = false) {
 
   const reviewMap = await fetchReviewStatsByProductIds([row.id]);
   return mapProduct(row, reviewMap);
+}
+
+async function getProductById(id, includeInactive = false) {
+  return _getProductByIdWithClient(prisma, id, includeInactive);
 }
 
 async function getProductBySlug(slug) {
@@ -303,7 +307,7 @@ async function createProduct(payload) {
       }
     });
 
-    return getProductById(product.id, true);
+    return _getProductByIdWithClient(tx, product.id, true);
   });
 }
 
@@ -373,7 +377,7 @@ async function updateProduct(id, payload) {
       data
     });
 
-    return getProductById(id, true);
+    return _getProductByIdWithClient(tx, id, true);
   });
 }
 
