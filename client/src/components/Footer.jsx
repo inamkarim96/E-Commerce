@@ -51,15 +51,15 @@ const Footer = () => {
             <h3>Contact Us</h3>
             <div className="contact-item">
               <MapPin size={18} />
-              <span>123 Nature St, Green Valley, CA 90210</span>
+              <span>Hunza Pakistan</span>
             </div>
             <div className="contact-item">
               <Phone size={18} />
-              <span>+1 (555) 123-4567</span>
+              <span>+92 3154125780</span>
             </div>
             <div className="contact-item">
               <Mail size={18} />
-              <span>hello@naturadry.com</span>
+              <span>inamkarim96@gmail.com</span>
             </div>
           </div>
         </div>

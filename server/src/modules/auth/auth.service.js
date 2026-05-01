@@ -70,7 +70,7 @@ async function register(payload) {
 
   const password_hash = await bcrypt.hash(payload.password, 12);
   const { name, email, phone, country, city, address } = payload;
-  
+
   const user = await prisma.users.create({
     data: {
       name,
@@ -81,7 +81,7 @@ async function register(payload) {
       is_active: false,
       email_verified: false,
       failed_login_attempts: 0,
-      ...( (address || city || country) ? {
+      ...((address || city || country) ? {
         addresses: {
           create: {
             full_name: name,
@@ -92,7 +92,7 @@ async function register(payload) {
             is_default: true
           }
         }
-      } : {} )
+      } : {})
     },
     include: { addresses: true }
   });
@@ -232,10 +232,10 @@ async function login(payload) {
   // Customer 2FA: Only require if not already verified
   if (!firebaseUser.emailVerified) {
     const customToken = await firebaseAuth.createCustomToken(firebaseUser.uid);
-    return { 
-      status: 'VERIFICATION_REQUIRED', 
+    return {
+      status: 'VERIFICATION_REQUIRED',
       email: user.email,
-      customToken 
+      customToken
     };
   }
 
@@ -434,8 +434,8 @@ async function firebaseLogin(idToken, profileData = null) {
   }
 
   // Admin Security Logic
-  const isAuthorizedAdmin = 
-    email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
+  const isAuthorizedAdmin =
+    email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ||
     phone_number === ADMIN_PHONE;
 
   if (!user) {
@@ -464,7 +464,7 @@ async function firebaseLogin(idToken, profileData = null) {
         role,
         password_hash: passwordHash,
         // Create address if provided
-        ...( (profileData?.address || profileData?.city || profileData?.country) ? {
+        ...((profileData?.address || profileData?.city || profileData?.country) ? {
           addresses: {
             create: {
               full_name: finalName,
@@ -475,7 +475,7 @@ async function firebaseLogin(idToken, profileData = null) {
               is_default: true
             }
           }
-        } : {} )
+        } : {})
       },
       include: { addresses: { where: { is_default: true } } }
     });
@@ -574,11 +574,11 @@ async function finalizeLoginAfterVerification(idToken) {
       data: { role: 'admin', updated_at: new Date() },
       include: { addresses: { where: { is_default: true } } }
     });
-    
+
     const cleanUser = sanitizeUser(updatedUser);
     const accessToken = createAccessToken(cleanUser);
     const refreshToken = createRefreshToken(cleanUser);
-    
+
     return { user: cleanUser, accessToken, refreshToken };
   }
 

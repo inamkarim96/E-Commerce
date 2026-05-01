@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const ApiError = require("../../utils/apiError");
 const slugify = require("../../utils/slugify");
+const cache = require("../../utils/cache");
 
 async function ensureUniqueSlug(name, excludeId = null) {
   const baseSlug = slugify(name);
@@ -118,7 +119,12 @@ async function listProducts(filters) {
     orderBy = { name: "asc" };
   }
 
-  const [total, rows] = await prisma.$transaction([
+  // Generate cache key based on filters
+  const cacheKey = `products:list:${JSON.stringify(filters)}`;
+  const cachedData = await cache.get(cacheKey);
+  if (cachedData) return cachedData;
+
+  const [total, rows] = await Promise.all([
     prisma.products.count({ where }),
     prisma.products.findMany({
       where,
@@ -138,7 +144,7 @@ async function listProducts(filters) {
   const reviewMap = await fetchReviewStatsByProductIds(productIds);
 
   const products = rows.map((row) => mapProduct(row, reviewMap));
-  return {
+  const result = {
     products,
     pagination: {
       page,
@@ -147,6 +153,11 @@ async function listProducts(filters) {
       pages: total === 0 ? 0 : Math.ceil(total / limit)
     }
   };
+
+  // Cache the result for 5 minutes
+  await cache.set(cacheKey, result, "EX", 300);
+
+  return result;
 }
 
 async function listAdminProducts(filters) {
@@ -154,7 +165,10 @@ async function listAdminProducts(filters) {
   const limit = Number(filters.limit || 10);
   const skip = (page - 1) * limit;
 
-  const [total, rows] = await prisma.$transaction([
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
+
+  const [total, rows] = await Promise.all([
     prisma.products.count(),
     prisma.products.findMany({
       include: {
@@ -173,7 +187,7 @@ async function listAdminProducts(filters) {
   const reviewMap = await fetchReviewStatsByProductIds(productIds);
 
   const products = rows.map((row) => mapProduct(row, reviewMap));
-  return {
+  const result = {
     products,
     pagination: {
       page,
@@ -182,6 +196,8 @@ async function listAdminProducts(filters) {
       pages: total === 0 ? 0 : Math.ceil(total / limit)
     }
   };
+  await cache.set(cacheKey, result, "EX", 300);
+  return result;
 }
 
 async function getFeaturedProducts() {
@@ -256,10 +272,20 @@ async function _getProductByIdWithClient(client, id, includeInactive = false) {
 }
 
 async function getProductById(id, includeInactive = false) {
-  return _getProductByIdWithClient(prisma, id, includeInactive);
+  const cacheKey = `product:id:${id}:${includeInactive}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
+
+  const result = await _getProductByIdWithClient(prisma, id, includeInactive);
+  await cache.set(cacheKey, result, "EX", 300);
+  return result;
 }
 
 async function getProductBySlug(slug) {
+  const cacheKey = `product:slug:${slug}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
+
   const row = await prisma.products.findUnique({
     where: { slug, is_active: true },
     select: { id: true }
@@ -267,7 +293,9 @@ async function getProductBySlug(slug) {
   if (!row) {
     throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
   }
-  return getProductById(row.id);
+  const result = await getProductById(row.id);
+  await cache.set(cacheKey, result, "EX", 300);
+  return result;
 }
 
 async function createProduct(payload) {
@@ -307,6 +335,7 @@ async function createProduct(payload) {
       }
     });
 
+    await cache.clearPattern("products:list");
     return _getProductByIdWithClient(tx, product.id, true);
   });
 }
@@ -359,7 +388,7 @@ async function updateProduct(id, payload) {
 
     if (payload.weight_variants?.length > 0) {
       data.stock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
-      
+
       // Update variants: delete and recreate for simplicity
       await tx.weight_variants.deleteMany({ where: { product_id: id } });
       data.weight_variants = {
@@ -377,6 +406,12 @@ async function updateProduct(id, payload) {
       data
     });
 
+    await Promise.all([
+      cache.clearPattern("products:list"),
+      cache.clearPattern("products:admin:list"),
+      cache.clearPattern(`product:id:${id}`),
+      cache.del(`product:slug:${existing.slug}`)
+    ]);
     return _getProductByIdWithClient(tx, id, true);
   });
 }
@@ -402,6 +437,7 @@ async function softDeleteProduct(id) {
       where: { id },
       data: { is_active: false, updated_at: new Date() }
     });
+    await cache.clearPattern("products:list");
   } catch (err) {
     if (err.code === "P2025") {
       throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");

@@ -73,146 +73,133 @@ const ProductDetailPage = () => {
 
         <div className="product-main">
           <div className="product-gallery">
-            <div className="main-image">
+            <div className="main-image-container">
               <img 
                 src={product.images?.find(img => img && img.trim() !== '') || 'https://images.unsplash.com/photo-1596003906949-67221c37965c?auto=format&fit=crop&q=80&w=800'} 
                 alt={product.name} 
+                className="main-product-img"
               />
             </div>
-            <div className="thumbnails">
-              {product.images?.filter(img => img && img.trim() !== '').map((img, index) => (
-                <div key={index} className={`thumb ${index === 0 ? 'active' : ''}`}>
-                  <img src={img} alt={`Thumbnail ${index}`} />
-                </div>
-              ))}
-            </div>
+            {product.images && product.images.filter(img => img && img.trim() !== '').length > 1 && (
+              <div className="thumbnails-grid">
+                {product.images.filter(img => img && img.trim() !== '').map((img, index) => (
+                  <div key={index} className={`thumbnail-item ${index === 0 ? 'active' : ''}`}>
+                    <img src={img} alt={`${product.name} thumbnail ${index + 1}`} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="product-info-panel">
-            <span className="cat-tag">{product.category?.name}</span>
-            <h1 className="product-name">{product.name}</h1>
-
-            <div className="rating-row">
-              <div className="stars">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={18} fill={i < Math.floor(product.avg_rating || 5) ? "var(--accent)" : "none"} color="var(--accent)" />
-                ))}
+            <div className="product-header">
+              <span className="category-label">{product.category?.name}</span>
+              <h1 className="product-title">{product.name}</h1>
+              
+              <div className="rating-container">
+                <div className="stars-row">
+                  {[...Array(5)].map((_, i) => (
+                    <Star 
+                      key={i} 
+                      size={16} 
+                      fill={i < Math.floor(product.avg_rating || 5) ? "var(--accent)" : "none"} 
+                      color="var(--accent)" 
+                    />
+                  ))}
+                </div>
+                <span className="rating-text">
+                  {product.avg_rating || 5.0} 
+                  <span className="review-count">({product.review_count || 0} reviews)</span>
+                </span>
               </div>
-              <span className="review-count">{product.avg_rating || 5} ({product.review_count || 0} Customer Reviews)</span>
             </div>
 
-            <div className="price-row">
-              <span className="current-price">
-                PKR {Number(selectedWeight?.price || product.base_price || 0).toLocaleString()}
-              </span>
+            <div className="product-pricing">
+              <div className="price-tag">
+                <span className="currency">PKR</span>
+                <span className="amount">{Number(selectedWeight?.price || product.base_price || 0).toLocaleString()}</span>
+              </div>
               {selectedWeight && (
-                <span className="unit-price">({selectedWeight.label})</span>
+                <Badge variant="info" className="weight-badge">{selectedWeight.label}</Badge>
               )}
             </div>
 
-            <p className="short-desc">{product.description}</p>
-
-            <div className="stock-status-container mb-6">
+            <div className="stock-info">
               {((selectedWeight ? selectedWeight.stock : product.stock) > 0) ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="success" className="px-3 py-1 text-xs">
-                      <ShieldCheck size={14} className="mr-1" /> In Stock
-                    </Badge>
-                    <span className="text-sm text-slate-500 font-medium">
-                      {(selectedWeight ? selectedWeight.stock : product.stock)} items available
-                    </span>
-                  </div>
-                  {(selectedWeight ? selectedWeight.stock : product.stock) < 10 && (
-                    <p className="text-xs text-red-600 font-bold animate-pulse">
-                      ⚠️ Hurry! Only a few left in stock.
-                    </p>
-                  )}
+                <div className="stock-status in-stock">
+                  <ShieldCheck size={16} />
+                  <span>{selectedWeight ? selectedWeight.stock : product.stock} items available in stock</span>
                 </div>
               ) : (
-                <Badge variant="error" className="px-3 py-1 text-xs uppercase">
-                   Out of Stock
-                </Badge>
+                <div className="stock-status out-of-stock">
+                  <Badge variant="error">Out of Stock</Badge>
+                </div>
               )}
             </div>
 
-            {product.weight_variants && product.weight_variants.length > 0 ? (
-              <div className="variant-section mb-8">
-                <h3 className="text-sm font-bold text-slate-400 uppercase mb-4">Select Weight:</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {product.weight_variants && product.weight_variants.length > 0 && (
+              <div className="variants-container">
+                <h3 className="section-subtitle">Select Weight</h3>
+                <div className="variants-grid">
                   {product.weight_variants.map(variant => {
-                    const cartItem = cart.find(item => item.id === product.id && (item.selectedWeight?.label === variant.label || item.selectedWeight === variant.label));
-                    const inCartCount = cartItem?.quantity || 0;
                     const isActive = selectedWeight?.id === variant.id;
-
                     return (
                       <button
                         key={variant.id}
-                        className={`relative p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${isActive ? 'border-primary bg-emerald-50' : 'border-slate-100 hover:border-slate-300'} ${variant.stock <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : 'cursor-pointer'}`}
+                        className={`variant-card ${isActive ? 'active' : ''} ${variant.stock <= 0 ? 'disabled' : ''}`}
                         onClick={() => variant.stock > 0 && setSelectedWeight(variant)}
                         disabled={variant.stock <= 0}
                       >
-                        {inCartCount > 0 && (
-                          <Badge variant="info" className="absolute -top-2 -right-2 scale-75 px-2">
-                            {inCartCount} in cart
-                          </Badge>
-                        )}
-                        <span className={`text-sm font-bold ${isActive ? 'text-primary' : 'text-slate-700'}`}>{variant.label}</span>
-                        <span className="text-xs text-slate-500">PKR {Number(variant.price).toLocaleString()}</span>
+                        <span className="variant-label">{variant.label}</span>
+                        <span className="variant-price">PKR {Number(variant.price).toLocaleString()}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
-            ) : (
-              <div className="variant-section no-variants mb-8">
-                <p className="text-sm text-slate-500 italic">Standard weight applies. Check stock below.</p>
-              </div>
             )}
 
-            <div className="purchase-section flex flex-wrap gap-4 items-center mb-8">
-              <div className="quantity-control flex items-center bg-slate-100 rounded-xl p-1">
-                <Button 
-                  variant="admin-ghost" 
-                  size="sm" 
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))} 
+            <div className="actions-container">
+              <div className="quantity-selector">
+                <button 
+                  className="qty-btn"
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
-                  className="bg-white shadow-sm h-10 w-10 p-0"
-                  icon={Minus}
-                />
-                <span className="w-12 text-center font-bold text-slate-800">{quantity}</span>
-                <Button 
-                  variant="admin-ghost" 
-                  size="sm" 
+                >
+                  <Minus size={16} />
+                </button>
+                <span className="qty-value">{quantity}</span>
+                <button 
+                  className="qty-btn"
                   onClick={() => setQuantity(prev => {
                     const max = selectedWeight ? selectedWeight.stock : product.stock;
                     return prev < max ? prev + 1 : prev;
                   })}
                   disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
-                  className="bg-white shadow-sm h-10 w-10 p-0"
-                  icon={Plus}
-                />
+                >
+                  <Plus size={16} />
+                </button>
               </div>
+
               <Button
                 variant="primary"
-                size="lg"
-                className="flex-1 min-w-[200px] h-12 text-lg"
-                icon={ShoppingCart}
+                className="add-to-cart-btn"
                 onClick={() => addToCart(product, quantity, selectedWeight)}
                 disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
               >
+                <ShoppingCart size={20} className="mr-2" />
                 {(selectedWeight ? selectedWeight.stock : product.stock) > 0 ? 'Add to Cart' : 'Out of Stock'}
               </Button>
             </div>
 
-            <div className="benefit-grid">
-              <div className="benefit-item">
-                <Truck size={20} />
-                <span>Free Delivery on orders over PKR 2,000</span>
+            <div className="trust-badges">
+              <div className="trust-item">
+                <Truck size={18} />
+                <span>Free Delivery over PKR 2,000</span>
               </div>
-              <div className="benefit-item">
-                <ShieldCheck size={20} />
-                <span>Quality Guaranteed</span>
+              <div className="trust-item">
+                <ShieldCheck size={18} />
+                <span>100% Organic & Quality Tested</span>
               </div>
             </div>
           </div>

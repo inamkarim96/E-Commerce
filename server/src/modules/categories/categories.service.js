@@ -1,6 +1,7 @@
 const prisma = require("../../config/prisma");
 const ApiError = require("../../utils/apiError");
 const slugify = require("../../utils/slugify");
+const cache = require("../../utils/cache");
 
 const PREDEFINED_CATEGORIES = [
   {
@@ -46,19 +47,26 @@ async function buildUniqueCategorySlug(name, excludeId = null) {
 }
 
 async function listCategories() {
+  const cacheKey = "categories:list";
+  const cachedData = await cache.get(cacheKey);
+  if (cachedData) return cachedData;
+
   const categories = await prisma.categories.findMany({
     include: {
       _count: {
-        select: { products: true } // Simplified: count all products
+        select: { products: true }
       }
     },
     orderBy: { created_at: "desc" }
   });
 
-  return categories.map((cat) => ({
+  const result = categories.map((cat) => ({
     ...cat,
     product_count: cat._count.products
   }));
+
+  await cache.set(cacheKey, result, "EX", 300);
+  return result;
 }
 
 async function getCategoryById(id) {
@@ -73,13 +81,15 @@ async function getCategoryById(id) {
 
 async function createCategory(payload) {
   const slug = await buildUniqueCategorySlug(payload.name);
-  return prisma.categories.create({
+  const result = await prisma.categories.create({
     data: {
       name: payload.name,
       slug,
       image: payload.image || null
     }
   });
+  await cache.del("categories:list");
+  return result;
 }
 
 async function updateCategory(id, payload) {
@@ -98,10 +108,12 @@ async function updateCategory(id, payload) {
     data.image = payload.image || null;
   }
 
-  return prisma.categories.update({
+  const result = await prisma.categories.update({
     where: { id },
     data
   });
+  await cache.del("categories:list");
+  return result;
 }
 
 async function deleteCategory(id) {
@@ -125,6 +137,7 @@ async function deleteCategory(id) {
   }
 
   await prisma.categories.delete({ where: { id } });
+  await cache.del("categories:list");
 }
 
 async function initializeDefaults() {

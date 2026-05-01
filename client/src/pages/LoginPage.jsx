@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, Phone, MapPin, Home, Key } from 'lucide-react';
+import { Mail, ArrowRight } from 'lucide-react';
 import { Button, Input, Card, Badge } from '../components/ui';
 
 import {
@@ -11,7 +11,8 @@ import {
   signInWithPhoneNumber,
   sendEmailVerification,
   updateProfile,
-  RecaptchaVerifier
+  RecaptchaVerifier,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import 'flag-icons/css/flag-icons.min.css';
@@ -110,6 +111,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [otp, setOtp] = useState('');
+  const [success, setSuccess] = useState(null);
 
   const { user, firebaseLogin, login, finalizeLogin } = useAuth();
   const navigate = useNavigate();
@@ -201,6 +203,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
 
     try {
@@ -264,7 +267,53 @@ const LoginPage = () => {
       }
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Authentication failed');
+      let msg = 'Authentication failed';
+      
+      // Handle Firebase specific error codes
+      if (err.code === 'auth/user-not-found' || err.message?.includes('user-not-found')) {
+        msg = 'this user is not register';
+      } else if (err.code === 'auth/wrong-password' || err.message?.includes('wrong-password')) {
+        msg = 'password is incorrect';
+      } else if (err.code === 'auth/invalid-credential') {
+        // Modern Firebase returns this for both, but we can try to be helpful
+        msg = 'Invalid email or password';
+      } else if (typeof err === 'string') {
+        msg = err;
+      } else {
+        msg = err.message || 'Authentication failed';
+      }
+      
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    if (!formData.email) {
+      setError('Please enter your email address to reset password.');
+      return;
+    }
+
+    const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase().trim();
+    if (formData.email.toLowerCase().trim() === adminEmail) {
+      setError('Password reset is restricted for administrator accounts.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, formData.email);
+      setSuccess('Password reset link has been sent to your email.');
+    } catch (err) {
+      if (err.code === 'auth/user-not-found' || err.message?.includes('user-not-found')) {
+        setError('this user is not register');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError(err.message || 'Failed to send reset email');
+      }
     } finally {
       setLoading(false);
     }
@@ -326,6 +375,12 @@ const LoginPage = () => {
             </div>
           )}
 
+          {success && (
+            <div className="bg-green-50 border border-green-100 text-green-700 p-4 rounded-xl mb-6 text-sm font-medium">
+              {success}
+            </div>
+          )}
+
           {confirmationResult ? (
             <form onSubmit={async (e) => {
               e.preventDefault();
@@ -338,7 +393,6 @@ const LoginPage = () => {
             }} className="login-form space-y-6">
               <Input
                 label="Phone Verification Code"
-                icon={Key}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
@@ -403,7 +457,6 @@ const LoginPage = () => {
                     value={formData.firstName}
                     onChange={handleChange}
                     placeholder="Jane"
-                    icon={User}
                     required
                   />
                   <Input
@@ -412,7 +465,6 @@ const LoginPage = () => {
                     value={formData.lastName}
                     onChange={handleChange}
                     placeholder="Doe"
-                    icon={User}
                     required
                   />
                 </div>
@@ -458,7 +510,6 @@ const LoginPage = () => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="jane@example.com"
-                    icon={Mail}
                     required
                   />
                   <Input
@@ -468,9 +519,19 @@ const LoginPage = () => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    icon={Lock}
                     required
                   />
+                  {isLogin && (
+                    <div className="flex justify-end -mt-3">
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        className="text-[11px] font-bold text-primary hover:underline transition-all opacity-80 hover:opacity-100"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -483,7 +544,6 @@ const LoginPage = () => {
                       value={formData.country}
                       onChange={handleChange}
                       placeholder="Pakistan"
-                      icon={MapPin}
                       required
                     />
                     <Input
@@ -492,7 +552,6 @@ const LoginPage = () => {
                       value={formData.city}
                       onChange={handleChange}
                       placeholder="Karachi"
-                      icon={MapPin}
                       required
                     />
                   </div>
@@ -502,7 +561,6 @@ const LoginPage = () => {
                     value={formData.address}
                     onChange={handleChange}
                     placeholder="123 Street Name"
-                    icon={MapPin}
                     required
                   />
                   <Input
@@ -512,7 +570,6 @@ const LoginPage = () => {
                     value={formData.rePassword}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    icon={Lock}
                     required
                   />
                 </div>

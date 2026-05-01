@@ -16,6 +16,7 @@ const Button = ({
   icon: Icon, 
   className = '', 
   disabled, 
+  as: Component = 'button',
   ...props 
 }) => {
   const baseClasses = 'inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
@@ -45,16 +46,16 @@ const Button = ({
   const sizeClass = sizes[size] || sizes.md;
 
   return (
-    <button 
+    <Component 
       className={`${baseClasses} ${variantClass} ${sizeClass} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
       {loading ? (
         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-      ) : Icon && <Icon size={size === 'sm' ? 16 : 20} />}
+      ) : Icon && (typeof Icon === 'function' || typeof Icon === 'object') ? <Icon size={size === 'sm' ? 16 : 20} /> : Icon}
       {children}
-    </button>
+    </Component>
   );
 };
 

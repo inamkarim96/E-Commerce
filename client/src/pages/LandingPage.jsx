@@ -91,47 +91,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Categories Section */}
-      <section className="categories-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Shop by Category</h2>
-            <p>Explore our carefully curated selection of natural products.</p>
-          </div>
-          
-          {loading ? (
-            <div className="state-msg">Loading categories...</div>
-          ) : categories.length === 0 ? (
-            <div className="state-msg">No categories available right now.</div>
-          ) : (
-            <div className="categories-grid">
-              {categories.map((cat, i) => (
-                <Card 
-                  key={cat.id || i}
-                  as={motion.div}
-                  className="group relative overflow-hidden cursor-pointer"
-                  whileHover={{ y: -10 }}
-                >
-                  <div className="aspect-square overflow-hidden">
-                    <img 
-                      src={cat.image || 'https://images.unsplash.com/photo-1596003906949-67221c37965c?auto=format&fit=crop&q=80&w=400'} 
-                      alt={cat.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                  </div>
-                  <div className="p-6 bg-white">
-                    <h3 className="text-xl font-bold text-slate-800 mb-1">{cat.name}</h3>
-                    <p className="text-xs text-slate-500 font-bold mb-4">{cat.product_count ? `${cat.product_count} Items` : 'Explore'}</p>
-                    <Link to={`/shop?category=${cat.slug}`} className="flex items-center gap-1 text-primary font-bold text-sm hover:gap-2 transition-all">
-                      Explore Collection <ArrowRight size={16} />
-                    </Link>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
 
 
     </div>

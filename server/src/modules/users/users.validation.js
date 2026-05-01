@@ -2,7 +2,7 @@ const Joi = require("joi");
 
 const updateProfileSchema = Joi.object({
   name: Joi.string().min(2).optional(),
-  phone: Joi.string().min(7).max(20).optional()
+  phone: Joi.string().min(7).max(20).optional().allow('', null)
 });
 
 const changePasswordSchema = Joi.object({

@@ -1,8 +1,25 @@
 import api from './axios';
 
+// Simple client-side cache
+const apiCache = new Map();
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+const fetchWithCache = async (key, fetcher) => {
+  const cached = apiCache.get(key);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    return cached.data;
+  }
+  const data = await fetcher();
+  apiCache.set(key, { data, timestamp: Date.now() });
+  return data;
+};
+
+// Function to clear cache when data is modified
+export const clearProductCache = () => apiCache.clear();
+
 export const getProducts = async (params) => {
-  const response = await api.get('/products', { params });
-  return response.data;
+  const key = `products:${JSON.stringify(params)}`;
+  return fetchWithCache(key, () => api.get('/products', { params }).then(res => res.data));
 };
 
 export const getAdminProducts = async (params) => {
@@ -11,52 +28,57 @@ export const getAdminProducts = async (params) => {
 };
 
 export const getFeaturedProducts = async () => {
-  const response = await api.get('/products/featured');
-  return response.data;
+  return fetchWithCache('products:featured', () => api.get('/products/featured').then(res => res.data));
 };
 
 export const searchProducts = async (query) => {
-  const response = await api.get(`/products/search?q=${query}`);
-  return response.data;
+  const key = `products:search:${query}`;
+  return fetchWithCache(key, () => api.get(`/products/search?q=${query}`).then(res => res.data));
 };
 
 export const getProduct = async (id) => {
-  const response = await api.get(`/products/${id}`);
-  return response.data;
+  const key = `product:${id}`;
+  return fetchWithCache(key, () => api.get(`/products/${id}`).then(res => res.data));
 };
 
 export const getProductBySlug = async (slug) => {
-  const response = await api.get(`/products/slug/${slug}`);
-  return response.data;
+  const key = `product:slug:${slug}`;
+  return fetchWithCache(key, () => api.get(`/products/slug/${slug}`).then(res => res.data));
 };
 
 export const createProduct = async (data) => {
   const response = await api.post('/products', data);
+  clearProductCache();
   return response.data;
 };
 
 export const updateProduct = async (id, data) => {
   const response = await api.put(`/products/${id}`, data);
+  clearProductCache();
   return response.data;
 };
 
 export const updateStock = async (id, stock) => {
   const response = await api.patch(`/products/${id}/stock`, { stock });
+  clearProductCache();
   return response.data;
 };
 
 export const updateVariantStock = async (productId, variantId, stock) => {
   const response = await api.patch(`/products/${productId}/variants/${variantId}/stock`, { stock });
+  clearProductCache();
   return response.data;
 };
 
 export const toggleFeatured = async (id, is_featured) => {
   const response = await api.patch(`/products/${id}/featured`, { is_featured });
+  clearProductCache();
   return response.data;
 };
 
 export const toggleActive = async (id, is_active) => {
   const response = await api.patch(`/products/${id}/active`, { is_active });
+  clearProductCache();
   return response.data;
 };
 
@@ -68,45 +90,51 @@ export const uploadProductImage = async (id, file) => {
       'Content-Type': 'multipart/form-data',
     },
   });
+  clearProductCache();
   return response.data;
 };
 
 export const deleteProductImage = async (id, imageUrl) => {
   const response = await api.delete(`/products/${id}/images`, { data: { image_url: imageUrl } });
+  clearProductCache();
   return response.data;
 };
 
 export const deleteProduct = async (id) => {
   const response = await api.delete(`/products/${id}`);
+  clearProductCache();
   return response.data;
 };
 
 export const getCategories = async () => {
-  const response = await api.get('/categories');
-  return response.data;
+  return fetchWithCache('categories', () => api.get('/categories').then(res => res.data));
 };
 
 export const getCategory = async (id) => {
-  const response = await api.get(`/categories/${id}`);
-  return response.data;
+  const key = `category:${id}`;
+  return fetchWithCache(key, () => api.get(`/categories/${id}`).then(res => res.data));
 };
 
 export const createCategory = async (data) => {
   const response = await api.post('/categories', data);
+  clearProductCache();
   return response.data;
 };
 
 export const updateCategory = async (id, data) => {
   const response = await api.put(`/categories/${id}`, data);
+  clearProductCache();
   return response.data;
 };
 
 export const deleteCategory = async (id) => {
   const response = await api.delete(`/categories/${id}`);
+  clearProductCache();
   return response.data;
 };
 
 export const initializeCategories = async () => {
   const response = await api.post('/categories/initialize');
+  clearProductCache();
   return response.data;
 };

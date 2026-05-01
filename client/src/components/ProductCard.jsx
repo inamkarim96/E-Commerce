@@ -5,9 +5,15 @@ import { motion } from 'framer-motion';
 
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-hot-toast';
+import { getProductBySlug } from '../api/products';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
+
+  const handlePrefetch = () => {
+    // Start fetching product details in background
+    getProductBySlug(product.slug).catch(() => {});
+  };
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -20,6 +26,7 @@ const ProductCard = ({ product }) => {
   return (
     <motion.div
       className="product-card"
+      onMouseEnter={handlePrefetch}
       whileHover={{ y: -5 }}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
