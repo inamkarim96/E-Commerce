@@ -30,8 +30,8 @@ function sendOrderEmailAsync({ to, subject, text, html }) {
     .catch((error) => console.error("Order email send failed:", error?.message || error));
 }
 
-async function fetchOrderItems(orderId) {
-  return prisma.order_items.findMany({
+async function fetchOrderItems(orderId, client = prisma) {
+  return client.order_items.findMany({
     where: { order_id: orderId },
     include: {
       products: {
@@ -49,8 +49,8 @@ async function fetchOrderItems(orderId) {
   })));
 }
 
-async function fetchOrderById(orderId) {
-  const order = await prisma.orders.findUnique({
+async function fetchOrderById(orderId, client = prisma) {
+  const order = await client.orders.findUnique({
     where: { id: orderId },
     include: {
       users: {
@@ -72,7 +72,7 @@ async function fetchOrderById(orderId) {
     throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
   }
 
-  const items = await fetchOrderItems(order.id);
+  const items = await fetchOrderItems(order.id, client);
 
   return {
     ...order,
@@ -338,7 +338,7 @@ async function cancelOwnOrder(userId, orderId) {
       });
     }
 
-    const updated = await fetchOrderById(orderId);
+    const updated = await fetchOrderById(orderId, tx);
     return updated;
   });
 }
@@ -435,7 +435,7 @@ async function updateOrderStatusByAdmin(orderId, payload, adminId) {
       }
     }
 
-    return fetchOrderById(orderId);
+    return fetchOrderById(orderId, tx);
   });
 }
 

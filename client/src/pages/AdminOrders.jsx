@@ -17,6 +17,7 @@ const AdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [adminNotes, setAdminNotes] = useState('');
   const [notesLoading, setNotesLoading] = useState(false);
+  const [shippingModal, setShippingModal] = useState({ isOpen: false, orderId: null, tracking: '', courier: '' });
 
   useEffect(() => {
     if (selectedOrder) {
@@ -48,19 +49,13 @@ const AdminOrders = () => {
   }, []);
 
   const handleStatusUpdate = async (orderId, newStatus) => {
+    if (newStatus === 'shipped') {
+      setShippingModal({ isOpen: true, orderId, tracking: '', courier: '' });
+      return;
+    }
+
     try {
-      let payload = { status: newStatus };
-      if (newStatus === 'shipped') {
-        const tracking = window.prompt('Enter tracking number:');
-        const courier = window.prompt('Enter courier name:');
-        if (!tracking || !courier) {
-          toast.error('Tracking and courier are required for shipping');
-          return;
-        }
-        payload = { ...payload, tracking_number: tracking, courier };
-      }
-      
-      await adminApi.updateOrderStatus(orderId, payload);
+      await adminApi.updateOrderStatus(orderId, { status: newStatus });
       toast.success('Order status updated');
       fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {
@@ -70,7 +65,28 @@ const AdminOrders = () => {
       const errorMsg = err?.response?.data?.error?.message || err?.message || 'Failed to update status';
       toast.error(errorMsg);
     }
+  };
 
+  const confirmShipping = async () => {
+    const { orderId, tracking, courier } = shippingModal;
+    if (!tracking.trim() || !courier.trim()) {
+      toast.error('Tracking and courier are required for shipping');
+      return;
+    }
+
+    try {
+      const payload = { status: 'shipped', tracking_number: tracking.trim(), courier: courier.trim() };
+      await adminApi.updateOrderStatus(orderId, payload);
+      toast.success('Order marked as shipped');
+      setShippingModal({ isOpen: false, orderId: null, tracking: '', courier: '' });
+      fetchOrders();
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(prev => ({ ...prev, status: 'shipped' }));
+      }
+    } catch (err) {
+      const errorMsg = err?.response?.data?.error?.message || err?.message || 'Failed to ship order';
+      toast.error(errorMsg);
+    }
   };
 
   const handleViewOrder = async (orderId) => {
@@ -313,7 +329,43 @@ const AdminOrders = () => {
         </div>
       </Modal>
 
-      
+      <Modal
+        isOpen={shippingModal.isOpen}
+        onClose={() => setShippingModal({ isOpen: false, orderId: null, tracking: '', courier: '' })}
+        title="Ship Order"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 mb-4">Please provide the shipping details to mark this order as shipped.</p>
+          <Input
+            label="Tracking Number"
+            placeholder="e.g. TRK-123456789"
+            value={shippingModal.tracking}
+            onChange={(e) => setShippingModal(p => ({ ...p, tracking: e.target.value }))}
+          />
+          <Input
+            label="Courier Name"
+            placeholder="e.g. TCS, Leopards, DHL"
+            value={shippingModal.courier}
+            onChange={(e) => setShippingModal(p => ({ ...p, courier: e.target.value }))}
+          />
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+            <Button 
+              variant="admin-ghost" 
+              onClick={() => setShippingModal({ isOpen: false, orderId: null, tracking: '', courier: '' })}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="admin-primary" 
+              onClick={confirmShipping}
+            >
+              Confirm Shipment
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 };

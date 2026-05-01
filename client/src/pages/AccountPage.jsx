@@ -549,6 +549,20 @@ const AccountPage = () => {
             </div>
           </Card>
 
+          {selectedOrderDetails?.status === 'shipped' && selectedOrderDetails?.tracking_number && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
+              <div>
+                <p className="text-emerald-800 font-bold mb-1">Shipped via {selectedOrderDetails.courier || 'Courier'}</p>
+                <p className="text-sm text-emerald-600">
+                  Tracking Number: 
+                  <span className="font-mono font-bold bg-white px-2 py-1 rounded ml-2 border border-emerald-200">
+                    {selectedOrderDetails.tracking_number}
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
+
           <div>
             <h3 className="text-lg font-bold mb-3">Order Items</h3>
             <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
