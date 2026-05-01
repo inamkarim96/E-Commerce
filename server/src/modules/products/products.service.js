@@ -165,6 +165,7 @@ async function listAdminProducts(filters) {
   const limit = Number(filters.limit || 10);
   const skip = (page - 1) * limit;
 
+  const cacheKey = `products:admin:list:${JSON.stringify(filters)}`;
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
