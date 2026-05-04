@@ -292,6 +292,9 @@ async function createOrderFromCart(userId, payload) {
       subtotal,
       total
     };
+  }, {
+    maxWait: 5000,
+    timeout: 20000
   });
 
   const order = await fetchOrderById(result.orderId);
