@@ -136,7 +136,17 @@ const CheckoutPage = () => {
         return; // Browser is redirecting — stop here
       }
 
-      // COD and Stripe → go to confirmation page
+      if (gateway === 'stripe') {
+        const payResponse = await ordersApi.initiatePayment(orderId, 'stripe');
+        const paymentUrl = payResponse.data?.payment_url;
+        
+        if (!paymentUrl) throw new Error('Stripe response missing payment URL.');
+        
+        window.location.href = paymentUrl;
+        return; // Redirecting to Stripe hosted checkout
+      }
+
+      // COD → go to confirmation page
       clearCart();
       navigate('/order-confirmation', {
         state: {

@@ -81,7 +81,7 @@ async function initiatePayment(userId, { order_id, gateway }) {
     }
 
     if (gateway === "stripe") {
-      const { client_secret, payment_url } = await stripeService.createPaymentIntent(order);
+      const { client_secret, payment_url } = await stripeService.createCheckoutSession(order);
       return { client_secret, payment_url };
     }
 
@@ -156,9 +156,9 @@ async function handleJazzcashWebhook(data) {
 }
 
 async function handleStripeWebhook(event) {
-  if (event.type === "payment_intent.succeeded") {
-    const paymentIntent = event.data.object;
-    const orderId = paymentIntent.metadata.order_id;
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const orderId = session.metadata.order_id;
     
     if (!orderId) return { success: true };
 
@@ -174,8 +174,8 @@ async function handleStripeWebhook(event) {
         where: { id: order.payments.id },
         data: {
           status: "completed",
-          transaction_id: paymentIntent.id,
-          gateway_resp: JSON.stringify(paymentIntent),
+          transaction_id: session.payment_intent || session.id,
+          gateway_resp: JSON.stringify(session),
           paid_at: new Date(),
           updated_at: new Date()
         }
@@ -195,16 +195,16 @@ async function handleStripeWebhook(event) {
         });
       }
     });
-  } else if (event.type === "payment_intent.payment_failed") {
-    const paymentIntent = event.data.object;
-    const orderId = paymentIntent.metadata.order_id;
+  } else if (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") {
+    const session = event.data.object;
+    const orderId = session.metadata.order_id;
     
     if (orderId) {
       await prisma.payments.updateMany({
         where: { order_id: orderId },
         data: {
           status: "failed",
-          gateway_resp: JSON.stringify(paymentIntent),
+          gateway_resp: JSON.stringify(session),
           updated_at: new Date()
         }
       });
