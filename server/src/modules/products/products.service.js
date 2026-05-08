@@ -459,16 +459,22 @@ async function updateStock(id, stock) {
   }
 }
 
-async function softDeleteProduct(id) {
+async function deleteProduct(id) {
   try {
-    await prisma.products.update({
-      where: { id },
-      data: { is_active: false, updated_at: new Date() }
+    await prisma.products.delete({
+      where: { id }
     });
-    await cache.clearPattern("products:list");
+    await Promise.all([
+      cache.clearPattern("products:list"),
+      cache.clearPattern("products:admin:list"),
+      cache.clearPattern(`product:id:${id}`)
+    ]);
   } catch (err) {
     if (err.code === "P2025") {
       throw new ApiError(404, "Product not found", "PRODUCT_NOT_FOUND");
+    }
+    if (err.code === "P2003") {
+      throw new ApiError(400, "Cannot permanently delete product because it is linked to existing orders. You should deactivate it instead.", "DELETE_RESTRICTED");
     }
     throw err;
   }
@@ -500,6 +506,6 @@ module.exports = {
   createProduct,
   updateProduct,
   updateStock,
-  softDeleteProduct,
+  deleteProduct,
   appendProductImage
 };

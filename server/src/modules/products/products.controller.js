@@ -71,7 +71,7 @@ async function updateStock(req, res) {
 }
 
 async function deleteProduct(req, res) {
-  await productsService.softDeleteProduct(req.params.id);
+  await productsService.deleteProduct(req.params.id);
   return sendSuccess(res, { message: "Product deleted successfully" });
 }
 

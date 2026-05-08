@@ -38,6 +38,8 @@ const AdminProducts = () => {
   });
 
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, productId: null, productName: '' });
+  const [previewImage, setPreviewImage] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]); // For new products
@@ -141,37 +143,63 @@ const AdminProducts = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+  const handleDelete = (product) => {
+    setDeleteConfirm({ show: true, productId: product.id, productName: product.name });
+  };
+
+  const executeDelete = async () => {
+    const { productId } = deleteConfirm;
     try {
-      await productsApi.deleteProduct(id);
+      setSaving(true);
+      await productsApi.deleteProduct(productId);
       toast.success('Product deleted successfully');
+      setDeleteConfirm({ show: false, productId: null, productName: '' });
       fetchProducts();
     } catch (err) {
       console.error('Failed to delete product:', err);
-      toast.error('Failed to delete product');
+      const errorMsg = err?.response?.data?.error?.message || 'Failed to delete product';
+      toast.error(errorMsg);
+    } finally {
+      setSaving(false);
     }
   };
 
 
 
   const handleToggleFeatured = async (product) => {
+    const originalProducts = [...products];
+    const newStatus = !product.is_featured;
+    
+    // Optimistic Update
+    setProducts(prev => prev.map(p => 
+      p.id === product.id ? { ...p, is_featured: newStatus } : p
+    ));
+
     try {
-      await productsApi.updateProduct(product.id, { is_featured: !product.is_featured });
-      toast.success(`Product ${!product.is_featured ? 'featured' : 'un-featured'}`);
-      fetchProducts();
+      await productsApi.updateProduct(product.id, { is_featured: newStatus });
+      toast.success(`Product ${newStatus ? 'featured' : 'un-featured'}`);
     } catch (err) {
+      setProducts(originalProducts);
       toast.error('Failed to update featured status');
     }
   };
 
-  const handleToggleActive = async (product) => {
+  const handleUpdateStatus = async (product, isActive) => {
+    if (product.is_active === isActive) return;
+    
+    const originalProducts = [...products];
+    
+    // Optimistic Update
+    setProducts(prev => prev.map(p => 
+      p.id === product.id ? { ...p, is_active: isActive } : p
+    ));
+
     try {
-      await productsApi.updateProduct(product.id, { is_active: !product.is_active });
-      toast.success(`Product ${!product.is_active ? 'activated' : 'deactivated'}`);
-      fetchProducts();
+      await productsApi.updateProduct(product.id, { is_active: isActive });
+      toast.success(`Product ${isActive ? 'activated' : 'deactivated'}`);
     } catch (err) {
-      toast.error('Failed to update active status');
+      setProducts(originalProducts);
+      toast.error('Failed to update status');
     }
   };
 
@@ -355,12 +383,12 @@ const AdminProducts = () => {
               ) : filtered.map((p) => (
                 <tr key={p.id}>
                   <td>
-                    <div className="prod-img">
+                    <div className="prod-img" onClick={() => p.images?.[0] && setPreviewImage(p.images[0])}>
                       {p.images?.[0] ? (
                         <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                          <ImageIcon size={20} className="text-gray-300" />
+                        <div className="w-full h-full bg-gray-50 flex items-center justify-center">
+                          <ImageIcon size={18} className="text-gray-300" />
                         </div>
                       )}
                     </div>
@@ -382,14 +410,16 @@ const AdminProducts = () => {
                     </div>
                   </td>
                   <td>
-                    <Badge 
-                      variant={p.is_active ? 'success' : 'error'} 
-                      onClick={() => handleToggleActive(p)} 
-                      className="cursor-pointer"
-                      title="Toggle Active"
-                    >
-                      {p.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <Select
+                      value={p.is_active ? "active" : "inactive"}
+                      onChange={(e) => handleUpdateStatus(p, e.target.value === "active")}
+                      options={[
+                        { label: "Active", value: "active" },
+                        { label: "Deactive", value: "inactive" }
+                      ]}
+                      className={`text-xs font-bold !py-1 !px-2 rounded-lg border-none ${p.is_active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}
+                      containerClassName="!mb-0 w-28"
+                    />
                   </td>
                   <td>
                     <input 
@@ -412,7 +442,7 @@ const AdminProducts = () => {
                         variant="admin-danger"
                         size="sm"
                         icon={Trash2}
-                        onClick={() => handleDelete(p.id)}
+                        onClick={() => handleDelete(p)}
                         title="Delete"
                       />
                     </div>
@@ -560,8 +590,45 @@ const AdminProducts = () => {
           </Card>
         </div>
       </Modal>
-
       
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, productId: null, productName: '' })}
+        title="Delete Product"
+        size="sm"
+        footer={
+          <div className="flex gap-3 justify-end w-full">
+            <Button variant="admin-outline" onClick={() => setDeleteConfirm({ show: false, productId: null, productName: '' })}>Cancel</Button>
+            <Button variant="admin-danger" onClick={executeDelete} loading={saving}>Delete</Button>
+          </div>
+        }
+      >
+        <div className="p-4 text-center">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Trash2 size={32} />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 mb-2">Are you sure?</h3>
+          <p className="text-slate-600">
+            You are about to delete <strong>{deleteConfirm.productName}</strong>. This action cannot be undone.
+          </p>
+        </div>
+      </Modal>
+
+      {/* Image Preview Modal */}
+      <Modal
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+        title="Product Image Preview"
+        size="lg"
+      >
+        <div className="image-preview-modal-content">
+          {previewImage && (
+            <img src={previewImage} alt="Preview" />
+          )}
+        </div>
+      </Modal>
+
     </div>
   );
 };
