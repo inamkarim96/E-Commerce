@@ -1,13 +1,54 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>client</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Primary SEO -->
+  <title>NaturaDry — Premium Natural Dried Foods & Superfoods</title>
+  <meta name="description" content="Shop NaturaDry's premium collection of natural dried fruits, nuts, seeds, and superfoods. Fresh, healthy, and delivered to your door." />
+  <meta name="theme-color" content="#2d6a4f" />
+
+  <!-- Open Graph (Facebook, WhatsApp previews) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="NaturaDry — Premium Natural Dried Foods" />
+  <meta property="og:description" content="Fresh natural dried fruits, nuts, and superfoods delivered to your door." />
+  <meta property="og:site_name" content="NaturaDry" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="NaturaDry — Premium Natural Dried Foods" />
+  <meta name="twitter:description" content="Fresh natural dried fruits, nuts, and superfoods delivered to your door." />
+
+  <!-- Apple PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="NaturaDry" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Preconnect to critical external origins for faster resource loading.
+       Establishes TCP/TLS connections before JS requests images/fonts. -->
+  <link rel="preconnect" href="https://res.cloudinary.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Google Fonts: Inter for modern, premium typography -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- DNS-prefetch for other external services -->
+  <link rel="dns-prefetch" href="https://api.stripe.com" />
+  <link rel="dns-prefetch" href="https://restcountries.com" />
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>

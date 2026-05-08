@@ -1,9 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getMessaging } from "firebase/messaging";
-import { getAnalytics } from "firebase/analytics";
 
-// These values should be provided by the user from their Firebase Console
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -15,8 +12,18 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
-export const messaging = getMessaging(app);
-export const analytics = getAnalytics(app);
+
+export async function getFirebaseAnalytics() {
+  const { getAnalytics } = await import("firebase/analytics");
+  return getAnalytics(app);
+}
+
+export async function getFirebaseMessaging() {
+  const { getMessaging } = await import("firebase/messaging");
+  return getMessaging(app);
+}
 
 export default app;
+

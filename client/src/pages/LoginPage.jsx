@@ -19,6 +19,37 @@ import 'flag-icons/css/flag-icons.min.css';
 import { getExampleNumber } from 'libphonenumber-js/max';
 import examples from 'libphonenumber-js/examples.mobile.json';
 
+let cachedCountries = null;
+let countriesFetchPromise = null;
+
+function fetchCountries() {
+  if (cachedCountries) return Promise.resolve(cachedCountries);
+  if (countriesFetchPromise) return countriesFetchPromise;
+
+  countriesFetchPromise = fetch('https://restcountries.com/v3.1/all?fields=name,idd,flags,cca2')
+    .then(res => res.json())
+    .then(data => {
+      const formatted = data
+        .filter(c => c.idd && c.idd.root)
+        .map(c => ({
+          name: c.name.common,
+          code: c.idd.root + (c.idd.suffixes && c.idd.suffixes.length === 1 ? c.idd.suffixes[0] : ''),
+          cca2: c.cca2
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      cachedCountries = formatted;
+      countriesFetchPromise = null;
+      return formatted;
+    })
+    .catch(err => {
+      countriesFetchPromise = null;
+      console.error('Failed to fetch countries', err);
+      return [];
+    });
+
+  return countriesFetchPromise;
+}
+
 const CustomSelect = ({ options, value, onChange, placeholder, style, hideSelectedLabel }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,7 +186,6 @@ const LoginPage = () => {
 
             const idToken = await user.getIdToken(true);
             await finalizeLogin(idToken);
-            // Redirection is now handled by the useEffect above
           }
         }
       } catch (err) {
@@ -165,20 +195,9 @@ const LoginPage = () => {
   };
 
   useEffect(() => {
-    fetch('https://restcountries.com/v3.1/all?fields=name,idd,flags,cca2')
-      .then(res => res.json())
-      .then(data => {
-        const formatted = data
-          .filter(c => c.idd && c.idd.root)
-          .map(c => ({
-            name: c.name.common,
-            code: c.idd.root + (c.idd.suffixes && c.idd.suffixes.length === 1 ? c.idd.suffixes[0] : ''),
-            cca2: c.cca2
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setCountries(formatted);
-      })
-      .catch(err => console.error("Failed to fetch countries", err));
+    fetchCountries().then(data => {
+      if (data.length) setCountries(data);
+    });
   }, []);
 
   const setupRecaptcha = () => {
@@ -268,7 +287,7 @@ const LoginPage = () => {
     } catch (err) {
       console.error(err);
       let msg = 'Authentication failed';
-      
+
       // Handle Firebase specific error codes
       if (err.code === 'auth/user-not-found' || err.message?.includes('user-not-found')) {
         msg = 'this user is not register';
@@ -282,7 +301,7 @@ const LoginPage = () => {
       } else {
         msg = err.message || 'Authentication failed';
       }
-      
+
       setError(msg);
     } finally {
       setLoading(false);

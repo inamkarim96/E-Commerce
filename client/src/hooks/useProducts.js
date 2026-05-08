@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as productsApi from '../api/products';
 
 /**
- * Custom hook to manage product fetching and categories
- * @param {Object} options - Configuration options
+ * @param {Object} options
  * @param {boolean} options.isAdmin - Whether to fetch for admin dashboard
  * @param {Object} options.initialFilters - Initial filters for fetching
  */
@@ -13,6 +12,9 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(initialFilters);
+
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -29,14 +31,15 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
     }
   }, []);
 
-  const fetchProducts = useCallback(async (currentFilters = filters) => {
+  const fetchProducts = useCallback(async (currentFilters) => {
+    const resolvedFilters = currentFilters ?? filtersRef.current;
     try {
       setLoading(true);
       setError(null);
-      
+
       const apiCall = isAdmin ? productsApi.getAdminProducts : productsApi.getProducts;
-      const res = await apiCall(currentFilters);
-      
+      const res = await apiCall(resolvedFilters);
+
       if (res.success) {
         setProducts(res.data.products || []);
         return res.data;
@@ -47,13 +50,16 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, filters]);
+  }, [isAdmin]);
 
-  // Initial fetch
   useEffect(() => {
     fetchCategories();
-    fetchProducts();
-  }, [fetchCategories, fetchProducts]);
+    fetchProducts(initialFilters);
+  }, []);
+
+  useEffect(() => {
+    fetchProducts(filters);
+  }, [filters]);
 
   return {
     products,
@@ -64,8 +70,9 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
     setFilters,
     refresh: fetchProducts,
     refreshCategories: fetchCategories,
-    setProducts // Sometimes we need to update state manually after small changes
+    setProducts,
   };
 };
 
 export default useProducts;
+

@@ -2,6 +2,7 @@ const authService = require("./auth.service");
 const jwt = require("jsonwebtoken");
 const ApiError = require("../../utils/apiError");
 const { sendSuccess } = require("../../utils/apiResponse");
+const { NODE_ENV } = require("../../config/env");
 const {
   registerSchema,
   loginSchema,
@@ -12,10 +13,13 @@ const {
 } = require("./auth.validation");
 
 function setRefreshCookie(res, refreshToken) {
+  // Use "none" for cross-origin deployments (Vercel frontend + backend on different domains).
+  // "lax" works for same-origin dev. "strict" blocks the cookie entirely cross-origin.
+  const isProduction = NODE_ENV === "production";
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: true,
-    sameSite: "strict",
+    secure: isProduction,           // Must be true when sameSite="none"
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 }
@@ -80,10 +84,11 @@ async function logout(req, res) {
   }
 
   await authService.logout(userId);
+  const isProduction = NODE_ENV === "production";
   res.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: true,
-    sameSite: "strict"
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax"
   });
 
   return sendSuccess(res, { message: "Logged out successfully" });
