@@ -83,7 +83,6 @@ const AdminProducts = () => {
         description: formData.description || null,
         category_id: formData.category_id || null,
         base_price: parseFloat(formData.base_price) || 0,
-        stock: parseInt(formData.stock) || 0,
         is_featured: formData.is_featured,
         is_active: formData.is_active,
         weight_variants: formData.weight_variants.map(v => ({
@@ -154,24 +153,7 @@ const AdminProducts = () => {
     }
   };
 
-  const handleStockUpdate = async (id, currentStock) => {
-    const newStockStr = window.prompt('Enter new stock quantity:', currentStock);
-    if (newStockStr === null) return;
-    
-    const newStock = parseInt(newStockStr);
-    if (isNaN(newStock) || newStock < 0) {
-      toast.error('Please enter a valid positive number');
-      return;
-    }
-    
-    try {
-      await productsApi.updateStock(id, newStock);
-      toast.success('Stock updated successfully');
-      fetchProducts();
-    } catch (err) {
-      toast.error('Failed to update stock');
-    }
-  };
+
 
   const handleToggleFeatured = async (product) => {
     try {
@@ -281,15 +263,34 @@ const AdminProducts = () => {
     p.category?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const hasLowStock = products.some(p => p.stock < 10 || p.weight_variants?.some(v => v.stock < 10));
+    const lowStockVariants = [];
+    products.forEach(p => {
+      if (p.stock < 10) {
+        p.weight_variants?.forEach(v => {
+          if (v.stock < 10) {
+            lowStockVariants.push({ productName: p.name, variantLabel: v.label, stock: v.stock });
+          }
+        });
+      }
+    });
 
   return (
     <div className="admin-products">
-      {hasLowStock && (
+      {lowStockVariants.length > 0 && (
         <Card className="bg-amber-50 border-amber-200 mb-6 p-4">
-          <div className="flex items-center gap-2 text-amber-800">
-            <AlertTriangle size={20} />
-            <span className="font-semibold">Warning: Some products or variants are running low on stock (under 10 items).</span>
+          <div className="flex flex-col gap-2 text-amber-800">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={20} />
+              <span className="font-semibold text-lg">Low Stock Alerts</span>
+            </div>
+            <ul className="list-disc list-inside text-sm space-y-1">
+              {lowStockVariants.slice(0, 5).map((v, i) => (
+                <li key={i}>
+                  <strong>{v.productName}</strong> ({v.variantLabel}) is low: <span className="font-bold text-red-600">{v.stock} units left</span>
+                </li>
+              ))}
+              {lowStockVariants.length > 5 && <li>...and {lowStockVariants.length - 5} more</li>}
+            </ul>
           </div>
         </Card>
       )}
@@ -297,7 +298,7 @@ const AdminProducts = () => {
       <div className="page-header">
         <div>
           <h1>Products Management</h1>
-          <p>Manage your product catalog, stock, and pricing.</p>
+          <p>Manage your product catalog, weight variants, and pricing.</p>
         </div>
         <div className="header-actions flex gap-3">
           {categories.length === 0 && (
@@ -373,13 +374,12 @@ const AdminProducts = () => {
                   <td>{p.category?.name || '-'}</td>
                   <td>PKR {Number(p.base_price).toLocaleString()}</td>
                   <td>
-                    <button 
-                      onClick={() => handleStockUpdate(p.id, p.stock)}
-                      className={`text-sm font-bold px-2 py-1 rounded border border-dashed ${p.stock < 10 ? 'border-red-400 bg-red-50 text-red-600' : 'border-slate-300 text-slate-600'} hover:border-primary transition-colors cursor-pointer`}
-                      title="Click to edit stock"
+                    <div 
+                      className={`text-sm font-bold px-2 py-1 inline-block rounded border ${p.stock < 10 ? 'border-red-200 bg-red-50 text-red-600' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+                      title={p.weight_variants?.map(v => `${v.label}: ${v.stock}`).join(', ') || 'No variants'}
                     >
                       {p.stock} units
-                    </button>
+                    </div>
                   </td>
                   <td>
                     <Badge 
@@ -513,20 +513,7 @@ const AdminProducts = () => {
               onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
               containerClassName="md:col-span-2"
             />
-            <Input
-              label={formData.weight_variants.length > 0 ? "Total Stock (Auto-calculated)" : "Base Stock"}
-              type="number"
-              value={formData.weight_variants.length > 0 
-                ? formData.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0) 
-                : formData.stock
-              }
-              onChange={(e) => setFormData((p) => ({ ...p, stock: e.target.value }))}
-              placeholder="100"
-              disabled={formData.weight_variants.length > 0}
-              containerClassName={formData.weight_variants.length > 0 ? "opacity-80" : ""}
-              helpText={formData.weight_variants.length > 0 ? "Sum of all weight variant stocks" : ""}
-            />
-            <div className="flex gap-6 items-center pt-6">
+            <div className="flex gap-6 items-center pt-2">
               <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
                 <input type="checkbox" checked={formData.is_featured} onChange={(e) => setFormData(p => ({ ...p, is_featured: e.target.checked }))} className="w-4 h-4 rounded text-primary" />
                 Featured
