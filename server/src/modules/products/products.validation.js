@@ -1,6 +1,7 @@
 const Joi = require("joi");
 
 const variantSchema = Joi.object({
+  id: Joi.string().uuid().optional(),
   label: Joi.string().trim().max(50).required(),
   weight_grams: Joi.number().integer().positive().required(),
   price: Joi.number().precision(2).positive().required(),

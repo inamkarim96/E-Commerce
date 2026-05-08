@@ -387,19 +387,46 @@ async function updateProduct(id, payload) {
       data.is_active = payload.is_active;
     }
 
-    if (payload.weight_variants?.length > 0) {
+    if (payload.weight_variants && payload.weight_variants.length > 0) {
       data.stock = payload.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
 
-      // Update variants: delete and recreate for simplicity
-      await tx.weight_variants.deleteMany({ where: { product_id: id } });
-      data.weight_variants = {
-        create: payload.weight_variants.map((v) => ({
+      const incomingIds = payload.weight_variants.map(v => v.id).filter(Boolean);
+      
+      // 1. Delete variants that were removed in UI
+      await tx.weight_variants.deleteMany({
+        where: {
+          product_id: id,
+          id: { notIn: incomingIds }
+        }
+      }).catch(err => {
+        // If deletion fails (e.g. referenced in orders), we just skip it
+        // This prevents 500 errors while maintaining data integrity
+        console.warn(`Could not delete some variants for product ${id}:`, err.message);
+      });
+
+      // 2. Separate create and update
+      for (const v of payload.weight_variants) {
+        const variantData = {
           label: v.label,
           weight_grams: v.weight_grams,
           price: v.price,
           stock: v.stock ?? 0
-        }))
-      };
+        };
+
+        if (v.id) {
+          await tx.weight_variants.update({
+            where: { id: v.id },
+            data: variantData
+          });
+        } else {
+          await tx.weight_variants.create({
+            data: {
+              ...variantData,
+              product_id: id
+            }
+          });
+        }
+      }
     }
 
     await tx.products.update({

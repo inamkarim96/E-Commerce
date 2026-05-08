@@ -87,6 +87,7 @@ const AdminProducts = () => {
         is_featured: formData.is_featured,
         is_active: formData.is_active,
         weight_variants: formData.weight_variants.map(v => ({
+          id: v.id,
           label: v.label,
           weight_grams: parseInt(v.weight_grams) || 0,
           price: parseFloat(v.price) || 0,
