@@ -514,11 +514,17 @@ const AdminProducts = () => {
               containerClassName="md:col-span-2"
             />
             <Input
-              label="Base Stock"
+              label={formData.weight_variants.length > 0 ? "Total Stock (Auto-calculated)" : "Base Stock"}
               type="number"
-              value={formData.stock}
+              value={formData.weight_variants.length > 0 
+                ? formData.weight_variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0) 
+                : formData.stock
+              }
               onChange={(e) => setFormData((p) => ({ ...p, stock: e.target.value }))}
               placeholder="100"
+              disabled={formData.weight_variants.length > 0}
+              containerClassName={formData.weight_variants.length > 0 ? "opacity-80" : ""}
+              helpText={formData.weight_variants.length > 0 ? "Sum of all weight variant stocks" : ""}
             />
             <div className="flex gap-6 items-center pt-6">
               <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">

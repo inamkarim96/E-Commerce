@@ -15,6 +15,7 @@ const Input = ({
   type = 'text',
   className = '', 
   containerClassName = '',
+  helpText,
   ...props 
 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +48,7 @@ const Input = ({
         )}
       </div>
       {error && <p className="mt-1 text-xs text-red-600 font-medium">{error}</p>}
+      {!error && helpText && <p className="mt-1 text-xs text-slate-500">{helpText}</p>}
     </div>
   );
 };
