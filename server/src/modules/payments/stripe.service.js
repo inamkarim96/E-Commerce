@@ -23,7 +23,7 @@ async function createCheckoutSession(order) {
         price_data: {
           currency: 'pkr',
           product_data: {
-            name: `NaturaDry Order #${order.id}`,
+            name: `KarakoramStore Order #${order.id}`,
           },
           unit_amount: amount,
         },

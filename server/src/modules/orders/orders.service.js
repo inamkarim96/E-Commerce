@@ -311,8 +311,8 @@ async function createOrderFromCart(userId, payload) {
   sendOrderEmailAsync({
     to: order.user_email,
     subject: `Order confirmation - ${order.id}`,
-    text: `Your NaturaDry order has been placed. Status: ${order.status}`,
-    html: `<p>Your NaturaDry order has been placed.</p><p>Order ID: <strong>${order.id}</strong></p><p>Status: ${order.status}</p>`
+    text: `Your KarakoramStore order has been placed. Status: ${order.status}`,
+    html: `<p>Your KarakoramStore order has been placed.</p><p>Order ID: <strong>${order.id}</strong></p><p>Status: ${order.status}</p>`
   });
 
   return {

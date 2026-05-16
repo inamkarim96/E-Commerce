@@ -73,7 +73,7 @@ const AboutPage = () => {
                 <div className="absolute -bottom-4 left-0 w-20 h-2 bg-accent rounded-full"></div>
               </div>
               <p className="text-lg text-slate-500 leading-relaxed pt-4">
-                At <strong className="text-slate-800">NaturaDry</strong>, we believe that the best foods
+                At <strong className="text-slate-800">KarakoramStore</strong>, we believe that the best foods
                 come straight from the earth. Our journey began with a simple
                 idea: to make premium, organic dry fruits and nuts accessible to
                 everyone without compromising on quality or the environment.
@@ -173,7 +173,7 @@ const AboutPage = () => {
           viewport={{ once: true }}
           variants={fadeInVariants}
         >
-          <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">Experience the NaturaDry Difference</h2>
+          <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">Experience the KarakoramStore Difference</h2>
           <p className="text-xl opacity-80 mb-10 max-w-2xl mx-auto leading-relaxed">
             Explore our premium selection and take a step towards a healthier
             lifestyle.

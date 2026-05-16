@@ -151,7 +151,7 @@ const CheckoutPage = () => {
       clearCart();
       navigate('/order-confirmation', {
         state: {
-          orderId: orderId || 'ND-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+          orderId: orderId || 'KS-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
         },
       });
     } catch (err) {

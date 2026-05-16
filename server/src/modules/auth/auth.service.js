@@ -331,7 +331,7 @@ async function forgotPassword(email) {
   await sendEmail({
     to: email,
     from: SENDGRID_FROM_EMAIL,
-    subject: "NaturaDry password reset OTP",
+    subject: "KarakoramStore password reset OTP",
     text: `Your password reset OTP is ${otp}. It expires in 10 minutes.`,
     html: `<p>Your password reset OTP is <strong>${otp}</strong>.</p>
            <p>It expires in 10 minutes.</p>`

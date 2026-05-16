@@ -32,7 +32,7 @@ const Navbar = () => {
       <div className="nav-container">
         <Link to="/" className="nav-logo">
           <Leaf className="logo-icon" />
-          <span>NaturaDry</span>
+          <span>KarakoramStore</span>
         </Link>
 
         {/* Desktop Links */}

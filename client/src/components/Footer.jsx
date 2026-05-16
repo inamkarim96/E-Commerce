@@ -12,7 +12,7 @@ const Footer = () => {
           <div className="footer-brand">
             <Link to="/" className="footer-logo">
               <Leaf className="logo-icon" />
-              <span>NaturaDry</span>
+              <span>KarakoramStore</span>
             </Link>
             <p className="footer-desc">
               Premium natural dried products delivered with care to your doorstep. Eco-friendly, sustainable, and purely natural.
@@ -65,7 +65,7 @@ const Footer = () => {
         </div>
 
         <div className="footer-bottom">
-          <p>&copy; {new Date().getFullYear()} NaturaDry. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} KarakoramStore. All rights reserved.</p>
           <div className="footer-legal">
             <Link to="/privacy">Privacy Policy</Link>
             <Link to="/terms">Terms of Service</Link>

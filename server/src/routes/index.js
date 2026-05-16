@@ -19,7 +19,7 @@ const router = express.Router();
 router.get(
   "/health",
   asyncHandler(async (req, res) => {
-    sendSuccess(res, { message: "NaturaDry backend is running" });
+    sendSuccess(res, { message: "KarakoramStore backend is running" });
   })
 );
 
