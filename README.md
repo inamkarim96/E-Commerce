@@ -45,8 +45,8 @@ A premium, full-stack e-commerce solution for natural dried products. This platf
 
 1.  **Clone the Repository**:
     ```bash
-    git clone https://github.com/inamkarim96/NaturaDry.git
-    cd NaturaDry
+    git clone https://github.com/inamkarim96/KarakoramStore.git
+    cd KarakoramStore
     ```
 
 2.  **Setup the Backend**:
@@ -72,7 +72,7 @@ A premium, full-stack e-commerce solution for natural dried products. This platf
 ## 📂 Project Structure
 
 ```text
-NaturaDry/
+KarakoramStore/
 ├── client/              # React Frontend (Vite)
 │   ├── src/
 │   │   ├── api/         # Axios API services
