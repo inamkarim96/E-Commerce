@@ -1,4 +1,4 @@
-# 🌿 NaturaDry E-Commerce Platform
+# 🏔️ KarakoramStore E-Commerce Platform
 
 A premium, full-stack e-commerce solution for natural dried products. This platform features a high-performance backend and a modern, responsive frontend designed with a focus on user experience and visual excellence.
 
