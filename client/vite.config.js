@@ -17,7 +17,6 @@ export default defineConfig({
           ],
           'vendor-framer': ['framer-motion'],
           'vendor-icons': ['lucide-react'],
-          'vendor-stripe': ['@stripe/stripe-js'],
         },
         assetFileNames: 'assets/[name]-[hash][extname]',
         chunkFileNames: 'assets/[name]-[hash].js',

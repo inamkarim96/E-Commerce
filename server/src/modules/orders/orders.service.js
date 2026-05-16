@@ -104,7 +104,8 @@ async function listOwnOrders(userId, { page, limit }) {
       include: {
         _count: {
           select: { order_items: true }
-        }
+        },
+        payments: true
       },
       orderBy: { created_at: "desc" },
       take: limitNum,
@@ -193,7 +194,15 @@ async function createOrderFromCart(userId, payload) {
     // FALLBACK
     if (!cartItems.length && payload.items && payload.items.length) {
       for (const item of payload.items) {
-        const variantId = item.variant_id || (typeof item.weight === 'object' ? item.weight.id : null);
+        let variantId = item.variant_id || (typeof item.weight === 'object' ? item.weight.id : null);
+        
+        if (!variantId && typeof item.weight === 'object' && item.weight.label) {
+          const matchedVariant = await tx.weight_variants.findFirst({
+            where: { product_id: item.product_id, label: item.weight.label }
+          });
+          if (matchedVariant) variantId = matchedVariant.id;
+        }
+
         if (!variantId) throw new ApiError(400, "Missing variant_id for item", "INVALID_PAYLOAD");
 
         const details = await tx.weight_variants.findUnique({
@@ -313,37 +322,47 @@ async function createOrderFromCart(userId, payload) {
 }
 
 async function cancelOwnOrder(userId, orderId) {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.orders.findUnique({
-      where: { id: orderId }
-    });
-    if (!order || order.user_id !== userId) {
-      throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
-    }
-    if (order.status !== "pending") {
-      throw new ApiError(400, "Only pending orders can be cancelled", "INVALID_ORDER_STATE");
-    }
-
-    await tx.orders.update({
-      where: { id: orderId },
-      data: { status: "cancelled", updated_at: new Date() }
-    });
-
-    const items = await tx.order_items.findMany({ where: { order_id: orderId } });
-    for (const item of items) {
-      await tx.weight_variants.update({
-        where: { id: item.variant_id },
-        data: { stock: { increment: item.quantity } }
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.orders.findUnique({
+        where: { id: orderId }
       });
-      await tx.products.update({
-        where: { id: item.product_id },
-        data: { stock: { increment: item.quantity } }
-      });
-    }
+      if (!order || order.user_id !== userId) {
+        throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
+      }
+      if (order.status !== "pending") {
+        throw new ApiError(400, "Only pending orders can be cancelled", "INVALID_ORDER_STATE");
+      }
 
-    const updated = await fetchOrderById(orderId, tx);
-    return updated;
-  });
+      await tx.orders.update({
+        where: { id: orderId },
+        data: { status: "cancelled", updated_at: new Date() }
+      });
+
+      const items = await tx.order_items.findMany({ where: { order_id: orderId } });
+      for (const item of items) {
+        if (item.variant_id) {
+          await tx.weight_variants.update({
+            where: { id: item.variant_id },
+            data: { stock: { increment: item.quantity } }
+          });
+        }
+        await tx.products.update({
+          where: { id: item.product_id },
+          data: { stock: { increment: item.quantity } }
+        });
+      }
+
+      const updated = await fetchOrderById(orderId, tx);
+      return updated;
+    }, {
+      maxWait: 5000,
+      timeout: 20000
+    });
+  } catch (error) {
+    console.error(`[cancelOwnOrder ERROR] Order: ${orderId}, User: ${userId}`, error);
+    throw error;
+  }
 }
 
 async function listAdminOrders(filters) {
@@ -454,11 +473,39 @@ async function updateOrderAdminNotes(orderId, notes) {
   return fetchOrderById(orderId);
 }
 
+async function deleteOwnOrder(userId, orderId) {
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId }
+  });
+
+  if (!order || order.user_id !== userId) {
+    throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
+  }
+
+  if (order.status !== "cancelled" && order.status !== "delivered") {
+    throw new ApiError(400, "Only cancelled or delivered orders can be deleted from history", "INVALID_ORDER_STATE");
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    // Delete payments first because of foreign key constraint
+    await tx.payments.deleteMany({
+      where: { order_id: orderId }
+    });
+
+    await tx.orders.delete({
+      where: { id: orderId }
+    });
+
+    return { success: true };
+  });
+}
+
 module.exports = {
   listOwnOrders,
   getOwnOrder,
   createOrderFromCart,
   cancelOwnOrder,
+  deleteOwnOrder,
   listAdminOrders,
   getAdminOrder,
   updateOrderStatusByAdmin,

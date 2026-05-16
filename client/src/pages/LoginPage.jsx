@@ -449,7 +449,7 @@ const LoginPage = () => {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="login-form">
+            <form onSubmit={handleSubmit} className="login-form" autoComplete="off">
               {isLogin && (
                 <div className="auth-method-tabs flex gap-2 p-1 bg-slate-100 rounded-xl mb-6">
                   <button
@@ -475,7 +475,7 @@ const LoginPage = () => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    placeholder="Jane"
+                    placeholder="Jhon"
                     required
                   />
                   <Input
@@ -528,7 +528,8 @@ const LoginPage = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="jane@example.com"
+                    placeholder="jhon@gmail.com"
+                    autoComplete="off"
                     required
                   />
                   <Input
@@ -538,6 +539,7 @@ const LoginPage = () => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
+                    autoComplete="new-password"
                     required
                   />
                   {isLogin && (

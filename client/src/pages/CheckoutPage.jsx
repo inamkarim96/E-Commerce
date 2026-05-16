@@ -90,8 +90,9 @@ const CheckoutPage = () => {
       const orderData = {
         items: cart.map((item) => ({
           product_id: item.id,
+          variant_id: typeof item.selectedWeight === 'object' ? item.selectedWeight.id : undefined,
           quantity: item.quantity,
-          weight: item.selectedWeight,
+          weight: typeof item.selectedWeight === 'object' ? item.selectedWeight : { label: item.selectedWeight || '' },
           price: item.price,
         })),
         shipping_address: {

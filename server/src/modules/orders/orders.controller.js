@@ -39,6 +39,11 @@ async function cancelOwnOrder(req, res) {
   return sendSuccess(res, { order });
 }
 
+async function deleteOwnOrder(req, res) {
+  await ordersService.deleteOwnOrder(req.user.sub, req.params.id);
+  return sendSuccess(res, { message: "Order deleted from history" });
+}
+
 async function listAdminOrders(req, res) {
   const query = assertValid(adminListOrdersSchema, req.query);
   const data = await ordersService.listAdminOrders(query);
@@ -66,6 +71,7 @@ module.exports = {
   getOwnOrder,
   createOrder,
   cancelOwnOrder,
+  deleteOwnOrder,
   listAdminOrders,
   getAdminOrder,
   updateOrderStatusByAdmin,

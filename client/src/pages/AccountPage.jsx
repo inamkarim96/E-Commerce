@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { User, Package, MapPin, Key, LogOut, ExternalLink, Grid, Box, ShoppingBag, Users, X, Info } from 'lucide-react';
+import { User, Package, MapPin, Key, LogOut, ExternalLink, Grid, Box, ShoppingBag, Users, X, Info, ArrowRight } from 'lucide-react';
 import { Button, Badge, Input, Modal, Card } from '../components/ui';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
-import { getMyOrders, getOrderById } from '../api/orders';
+import { getMyOrders, getOrderById, cancelOrder, initiatePayment, deleteOrder } from '../api/orders';
 import { getMyAddresses, addAddress, updateAddress, deleteAddress } from '../api/users';
 import { changePassword } from '../api/auth';
 
@@ -64,6 +64,9 @@ const AccountPage = () => {
   });
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState(null);
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [payingOrder, setPayingOrder] = useState(null);
 
   // Auto-redirect Admin to Admin Dashboard
   useEffect(() => {
@@ -144,6 +147,65 @@ const AccountPage = () => {
       console.error('Failed to load order details:', err);
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    try {
+      setOrdersLoading(true);
+      const res = await cancelOrder(orderId);
+      if (res.success) {
+        // Refresh orders list
+        const refreshedOrders = await getMyOrders();
+        if (refreshedOrders.success) setOrders(refreshedOrders.data.orders || []);
+      }
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+      const msg = err.response?.data?.error?.message || err.message || 'Failed to cancel order.';
+      alert(msg);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to delete this order from your history? This action cannot be undone.')) return;
+    try {
+      setOrdersLoading(true);
+      const res = await deleteOrder(orderId);
+      if (res.success) {
+        const refreshedOrders = await getMyOrders();
+        if (refreshedOrders.success) setOrders(refreshedOrders.data.orders || []);
+      }
+    } catch (err) {
+      console.error('Failed to delete order:', err);
+      const msg = err.response?.data?.error?.message || err.message || 'Failed to delete order.';
+      alert(msg);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const handleConfirmAndPay = async (gateway) => {
+    if (!payingOrder) return;
+    try {
+      setOrdersLoading(true);
+      const res = await initiatePayment(payingOrder.id, gateway);
+      if (res.success && res.data.payment_url) {
+        window.location.href = res.data.payment_url;
+      } else if (res.success && res.message) {
+        // COD or success message
+        alert(res.message);
+        const refreshedOrders = await getMyOrders();
+        if (refreshedOrders.success) setOrders(refreshedOrders.data.orders || []);
+        setShowPaymentModal(false);
+      }
+    } catch (err) {
+      console.error('Failed to initiate payment:', err);
+      alert('Failed to initiate payment. Please try again.');
+    } finally {
+      setOrdersLoading(false);
     }
   };
 
@@ -374,14 +436,48 @@ const AccountPage = () => {
                               <p className="font-bold text-slate-700">{order.items_count || 0} Products</p>
                             </div>
                           </div>
-                          <Button 
-                            variant="admin-outline" 
-                            size="sm" 
-                            icon={ExternalLink} 
-                            onClick={() => handleViewOrder(order.id)}
-                          >
-                            View Details
-                          </Button>
+                            <div className="flex gap-2">
+                              {order.status.toLowerCase() === 'pending' && (
+                                <>
+                                  {order.payments && order.payments.status === 'pending' && (
+                                    <Button 
+                                      variant="primary" 
+                                      size="sm" 
+                                      onClick={() => {
+                                        setPayingOrder(order);
+                                        setShowPaymentModal(true);
+                                      }}
+                                    >
+                                      Pay Now
+                                    </Button>
+                                  )}
+                                  <Button 
+                                    variant="admin-danger" 
+                                    size="sm" 
+                                    onClick={() => handleCancelOrder(order.id)}
+                                  >
+                                    Cancel Order
+                                  </Button>
+                                </>
+                              )}
+                              {order.status.toLowerCase() === 'cancelled' && (
+                                <Button 
+                                  variant="admin-danger" 
+                                  size="sm" 
+                                  onClick={() => handleDeleteOrder(order.id)}
+                                >
+                                  Delete Order
+                                </Button>
+                              )}
+                              <Button 
+                                variant="admin-outline" 
+                                size="sm" 
+                                icon={ExternalLink} 
+                                onClick={() => handleViewOrder(order.id)}
+                              >
+                                View Details
+                              </Button>
+                            </div>
                         </div>
                       </Card>
                     ))}
@@ -602,6 +698,63 @@ const AccountPage = () => {
       </Modal>
       )}
 
+      {showPaymentModal && (
+        <Modal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          title="Select Payment Method"
+          size="md"
+        >
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-500 mb-6 text-center">
+              Choose how you would like to pay for <strong>Order #{payingOrder?.id.substring(0, 8)}</strong>
+            </p>
+            <div className="grid grid-cols-1 gap-3">
+              <button 
+                onClick={() => handleConfirmAndPay('stripe')}
+                className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-primary hover:bg-emerald-50 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 font-bold">S</div>
+                  <div className="text-left">
+                    <p className="font-bold text-slate-800 m-0">Credit Card (Stripe)</p>
+                    <p className="text-xs text-slate-500 m-0">Pay securely with your credit/debit card</p>
+                  </div>
+                </div>
+                <ArrowRight size={18} className="text-slate-300 group-hover:text-primary" />
+              </button>
+
+              <button 
+                onClick={() => handleConfirmAndPay('jazzcash')}
+                className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-primary hover:bg-emerald-50 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center text-red-600 font-bold">J</div>
+                  <div className="text-left">
+                    <p className="font-bold text-slate-800 m-0">JazzCash</p>
+                    <p className="text-xs text-slate-500 m-0">Pay via JazzCash mobile wallet</p>
+                  </div>
+                </div>
+                <ArrowRight size={18} className="text-slate-300 group-hover:text-primary" />
+              </button>
+
+              <button 
+                onClick={() => handleConfirmAndPay('cod')}
+                className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-primary hover:bg-emerald-50 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center text-amber-600 font-bold">C</div>
+                  <div className="text-left">
+                    <p className="font-bold text-slate-800 m-0">Cash on Delivery</p>
+                    <p className="text-xs text-slate-500 m-0">Pay when your order is delivered</p>
+                  </div>
+                </div>
+                <ArrowRight size={18} className="text-slate-300 group-hover:text-primary" />
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </div>
   );

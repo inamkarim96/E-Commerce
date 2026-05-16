@@ -39,5 +39,27 @@ const authLimiter = isDev
       }
     });
 
-module.exports = { globalLimiter, authLimiter };
+/**
+ * Forgot-password rate limiter — applied ONLY to /auth/forgot-password
+ * and /auth/reset-password.
+ * Very strict: 5 requests per hour per IP.
+ * Protects against OTP spam, SendGrid credit abuse, and account enumeration.
+ */
+const forgotPasswordLimiter = isDev
+  ? (req, res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 60 * 1000, // 1 hour
+      max: 5,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        error: {
+          code: "OTP_RATE_LIMITED",
+          message: "Too many password reset attempts. Please wait 1 hour before trying again."
+        }
+      }
+    });
+
+module.exports = { globalLimiter, authLimiter, forgotPasswordLimiter };
 

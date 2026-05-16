@@ -1,21 +1,30 @@
 const Joi = require("joi");
 
+// Schema for each item in the fallback payload.items path.
+// - price is STRIPPED (stripUnknown: true in validate()) to prevent price injection
+// - variant_id must be a valid UUID if provided
+// - quantity is capped at 100 per item to prevent abuse
+const orderItemSchema = Joi.object({
+  product_id: Joi.string().uuid().required(),
+  variant_id: Joi.string().uuid().optional(),
+  quantity: Joi.number().integer().min(1).max(100).required(),
+  // weight is accepted as an object {id, label} from the frontend for UX,
+  // but the actual price is always fetched from the DB — never trusted from client.
+  weight: Joi.object({
+    id: Joi.string().uuid().optional(),
+    label: Joi.string().max(50).optional()
+  }).optional()
+  // price is intentionally omitted — will be stripped by stripUnknown
+});
+
 const createOrderSchema = Joi.object({
   shipping_address: Joi.object().required(),
   payment_method: Joi.string()
     .valid("jazzcash", "easypaisa", "stripe", "cod")
     .required(),
   coupon_code: Joi.string().trim().max(50).allow("", null).optional(),
-  notes: Joi.string().trim().allow("", null).optional(),
-  items: Joi.array().items(
-    Joi.object({
-      product_id: Joi.string().uuid().required(),
-      quantity: Joi.number().integer().min(1).required(),
-      variant_id: Joi.string().uuid().optional(), // optional if we use weight label or similar
-      weight: Joi.any().optional(), // allow the object we send from frontend
-      price: Joi.number().optional()
-    })
-  ).optional()
+  notes: Joi.string().trim().max(500).allow("", null).optional(),
+  items: Joi.array().items(orderItemSchema).max(50).optional()
 });
 
 const listOwnOrdersSchema = Joi.object({

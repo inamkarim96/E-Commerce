@@ -19,3 +19,13 @@ export const initiatePayment = async (orderId, gateway) => {
   const response = await api.post('/payments/initiate', { order_id: orderId, gateway });
   return response.data;
 };
+
+export const cancelOrder = async (orderId) => {
+  const response = await api.post(`/orders/${orderId}/cancel`);
+  return response.data;
+};
+
+export const deleteOrder = async (orderId) => {
+  const response = await api.delete(`/orders/${orderId}`);
+  return response.data;
+};
