@@ -26,6 +26,7 @@ function validate(schema, payload) {
 
 async function listCategories(req, res) {
   const categories = await categoriesService.listCategories();
+  res.set("Cache-Control", "public, max-age=300");
   return sendSuccess(res, { categories });
 }
 

@@ -2,6 +2,7 @@ const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const compression = require("compression");
 const { globalLimiter, authLimiter } = require("./middleware/rateLimiter");
 
 const { FRONTEND_URL } = require("./config/env");
@@ -11,6 +12,7 @@ const apiV1Router = require("./routes");
 
 const app = express();
 
+app.use(compression());
 app.use(
   helmet({
     contentSecurityPolicy: {

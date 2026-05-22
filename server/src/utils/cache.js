@@ -1,24 +1,29 @@
-const cacheStore = new Map();
+const NodeCache = require("node-cache");
+
+const cacheStore = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 const cache = {
   async get(key) {
     return cacheStore.get(key) || null;
   },
   async set(key, value, ex, ttl) {
-    cacheStore.set(key, value);
     if (ex === "EX" && ttl) {
-      setTimeout(() => cacheStore.delete(key), ttl * 1000);
+      cacheStore.set(key, value, ttl);
+    } else {
+      cacheStore.set(key, value);
     }
     return "OK";
   },
   async del(key) {
-    return cacheStore.delete(key) ? 1 : 0;
+    const deleted = cacheStore.del(key);
+    return deleted > 0 ? 1 : 0;
   },
   async clearPattern(pattern) {
     let count = 0;
-    for (const key of cacheStore.keys()) {
+    const keys = cacheStore.keys();
+    for (const key of keys) {
       if (key.startsWith(pattern)) {
-        cacheStore.delete(key);
+        cacheStore.del(key);
         count++;
       }
     }

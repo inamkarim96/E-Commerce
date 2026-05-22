@@ -8,6 +8,7 @@ import * as productsApi from '../api/products';
  */
 export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
   const [products, setProducts] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,6 +43,7 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
 
       if (res.success) {
         setProducts(res.data.products || []);
+        if (res.data.pagination) setPagination(res.data.pagination);
         return res.data;
       }
     } catch (err) {
@@ -63,6 +65,7 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
 
   return {
     products,
+    pagination,
     categories,
     loading,
     error,

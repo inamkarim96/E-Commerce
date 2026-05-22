@@ -5,6 +5,7 @@ import ProductCard from '../components/ProductCard';
 import { Button, Input, Select, Badge, Card } from '../components/ui';
 
 import useProducts from '../hooks/useProducts';
+import { ProductGridSkeleton } from '../components/PageSkeleton';
 
 const ShopPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -13,6 +14,7 @@ const ShopPage = () => {
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'All');
   const [selectedWeight, setSelectedWeight] = useState(searchParams.get('weight') || 'All');
   const [priceRange, setPriceRange] = useState({
@@ -21,22 +23,36 @@ const ShopPage = () => {
   });
   const [inStockOnly, setInStockOnly] = useState(searchParams.get('in_stock') === 'true');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'default');
+  const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (debouncedSearchQuery !== searchQuery) {
+        setDebouncedSearchQuery(searchQuery);
+        setPage(1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearchQuery]);
 
   const {
     products,
+    pagination,
     categories: rawCategories,
     loading,
     error,
     setFilters
   } = useProducts({
     initialFilters: {
-      q: searchQuery || undefined,
+      q: debouncedSearchQuery || undefined,
       category: selectedCategory === 'All' ? undefined : selectedCategory,
       weight_label: selectedWeight === 'All' ? undefined : selectedWeight,
       min_price: priceRange.min || undefined,
       max_price: priceRange.max || undefined,
       in_stock: inStockOnly || undefined,
-      sort: sortBy === 'default' ? undefined : sortBy
+      sort: sortBy === 'default' ? undefined : sortBy,
+      page: page,
+      limit: 20
     }
   });
 
@@ -53,39 +69,48 @@ const ShopPage = () => {
     return Array.from(labels);
   }, [products]);
 
-  // Update filters when any filter changes
   useEffect(() => {
     const filters = {
-      q: searchQuery || undefined,
+      q: debouncedSearchQuery || undefined,
       category: selectedCategory === 'All' ? undefined : selectedCategory,
       weight_label: selectedWeight === 'All' ? undefined : selectedWeight,
       min_price: priceRange.min || undefined,
       max_price: priceRange.max || undefined,
       in_stock: inStockOnly || undefined,
-      sort: sortBy === 'default' ? undefined : sortBy
+      sort: sortBy === 'default' ? undefined : sortBy,
+      page: page,
+      limit: 20
     };
     setFilters(filters);
 
     // Update URL params
     const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
+    if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
     if (selectedCategory !== 'All') params.set('category', selectedCategory);
     if (selectedWeight !== 'All') params.set('weight', selectedWeight);
     if (priceRange.min) params.set('min_price', priceRange.min);
     if (priceRange.max) params.set('max_price', priceRange.max);
     if (inStockOnly) params.set('in_stock', 'true');
     if (sortBy !== 'default') params.set('sort', sortBy);
+    if (page > 1) params.set('page', page);
     setSearchParams(params);
-  }, [searchQuery, selectedCategory, selectedWeight, priceRange, inStockOnly, sortBy, setFilters, setSearchParams]);
+  }, [debouncedSearchQuery, selectedCategory, selectedWeight, priceRange, inStockOnly, sortBy, page, setFilters, setSearchParams]);
 
   const clearAllFilters = () => {
     setSearchQuery('');
+    setDebouncedSearchQuery('');
     setSelectedCategory('All');
     setSelectedWeight('All');
     setPriceRange({ min: '', max: '' });
     setInStockOnly(false);
     setSortBy('default');
+    setPage(1);
     setSearchParams(new URLSearchParams());
+  };
+
+  const handleFilterChange = (setter, value) => {
+    setter(value);
+    setPage(1);
   };
 
   const hasActiveFilters = searchQuery || selectedCategory !== 'All' || selectedWeight !== 'All' ||
@@ -139,7 +164,7 @@ const ShopPage = () => {
                         type="radio"
                         name="category"
                         checked={selectedCategory === cat.slug}
-                        onChange={() => setSelectedCategory(cat.slug)}
+                        onChange={() => handleFilterChange(setSelectedCategory, cat.slug)}
                       />
                       <span>{cat.name}</span>
                     </label>
@@ -159,7 +184,7 @@ const ShopPage = () => {
                           type="radio"
                           name="weight"
                           checked={selectedWeight === range}
-                          onChange={() => setSelectedWeight(range)}
+                          onChange={() => handleFilterChange(setSelectedWeight, range)}
                         />
                         <span>{range === 'All' ? 'All Weights' : range}</span>
                       </label>
@@ -176,7 +201,7 @@ const ShopPage = () => {
                   type="number"
                   placeholder="Min"
                   value={priceRange.min}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, min: e.target.value }))}
+                  onChange={(e) => handleFilterChange(setPriceRange, prev => ({ ...prev, min: e.target.value }))}
                   containerClassName="mb-0 flex-1"
                   className="h-10"
                 />
@@ -185,7 +210,7 @@ const ShopPage = () => {
                   type="number"
                   placeholder="Max"
                   value={priceRange.max}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, max: e.target.value }))}
+                  onChange={(e) => handleFilterChange(setPriceRange, prev => ({ ...prev, max: e.target.value }))}
                   containerClassName="mb-0 flex-1"
                   className="h-10"
                 />
@@ -197,7 +222,7 @@ const ShopPage = () => {
                 <input
                   type="checkbox"
                   checked={inStockOnly}
-                  onChange={(e) => setInStockOnly(e.target.checked)}
+                  onChange={(e) => handleFilterChange(setInStockOnly, e.target.checked)}
                 />
                 <span>In Stock Only</span>
               </label>
@@ -219,7 +244,7 @@ const ShopPage = () => {
                 <Select
                   options={sortOptions}
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                  onChange={(e) => handleFilterChange(setSortBy, e.target.value)}
                   containerClassName="mb-0 w-[200px]"
                   className="h-10"
                 />
@@ -280,12 +305,35 @@ const ShopPage = () => {
 
             {error ? (
               <div className="error-msg">{error}</div>
+            ) : loading ? (
+              <ProductGridSkeleton count={8} />
             ) : (
-              <div className={`products-grid ${viewType}`}>
-                {products.map(product => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              <>
+                <div className={`products-grid ${viewType}`}>
+                  {products.map(product => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+                {pagination && pagination.pages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-8">
+                    <Button 
+                      variant="admin-outline" 
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-slate-600 font-medium">Page {page} of {pagination.pages}</span>
+                    <Button 
+                      variant="admin-outline" 
+                      onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
+                      disabled={page === pagination.pages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
 
             {!loading && products.length === 0 && (

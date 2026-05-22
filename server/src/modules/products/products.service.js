@@ -128,7 +128,18 @@ async function listProducts(filters) {
     prisma.products.count({ where }),
     prisma.products.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        category_id: true,
+        name: true,
+        slug: true,
+        base_price: true,
+        stock: true,
+        images: true,
+        is_featured: true,
+        is_active: true,
+        created_at: true,
+        updated_at: true,
         categories: true,
         weight_variants: {
           orderBy: { weight_grams: "asc" }
@@ -154,8 +165,9 @@ async function listProducts(filters) {
     }
   };
 
-  // Cache the result for 5 minutes
-  await cache.set(cacheKey, result, "EX", 300);
+  // Cache the result for 60s (or 120s if featured)
+  const ttl = filters.featuredOnly ? 120 : 60;
+  await cache.set(cacheKey, result, "EX", ttl);
 
   return result;
 }

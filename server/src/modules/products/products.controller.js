@@ -23,6 +23,7 @@ function assertValid(schema, payload) {
 async function listProducts(req, res) {
   const filters = assertValid(listProductsSchema, req.query);
   const data = await productsService.listProducts(filters);
+  res.set("Cache-Control", "public, max-age=60");
   return sendSuccess(res, data);
 }
 
@@ -33,6 +34,7 @@ async function listAdminProducts(req, res) {
 
 async function getFeaturedProducts(req, res) {
   const products = await productsService.getFeaturedProducts();
+  res.set("Cache-Control", "public, max-age=60");
   return sendSuccess(res, { products });
 }
 
@@ -44,11 +46,13 @@ async function searchProducts(req, res) {
 
 async function getProductById(req, res) {
   const product = await productsService.getProductById(req.params.id);
+  res.set("Cache-Control", "public, max-age=60");
   return sendSuccess(res, { product });
 }
 
 async function getProductBySlug(req, res) {
   const product = await productsService.getProductBySlug(req.params.slug);
+  res.set("Cache-Control", "public, max-age=60");
   return sendSuccess(res, { product });
 }
 
