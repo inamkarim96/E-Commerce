@@ -10,6 +10,15 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Simple In-Memory Cache for GET requests
+const CACHE_TTL = 120 * 1000; // 2 minutes
+const getCache = new Map();
+
+// Helper to clear cache manually if needed (e.g., after mutations)
+export const clearApiCache = () => {
+  getCache.clear();
+};
+
 // Tracks whether a token refresh is already in flight to prevent race
 let isRefreshing = false;
 let failedQueue = [];
@@ -25,9 +34,10 @@ function processQueue(error, token = null) {
   failedQueue = [];
 }
 
-// Attach access token from localStorage to every outgoing request.
+// Interceptor 1: Token Attach & Cache Check
 api.interceptors.request.use(
   (config) => {
+    // 1. Token Attach
     try {
       const user = JSON.parse(localStorage.getItem('naturadry_user') || 'null');
       const token = user?.accessToken || user?.token;
@@ -37,13 +47,47 @@ api.interceptors.request.use(
     } catch {
       // Corrupted localStorage — ignore and continue without token
     }
+
+    // 2. Cache Check (Only GET, exclude Auth)
+    if (config.method?.toLowerCase() === 'get' && !config.url?.includes('/auth')) {
+      const cacheKey = `${config.url}?${new URLSearchParams(config.params || {}).toString()}`;
+      const cached = getCache.get(cacheKey);
+      
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        // Create an Axios CancelToken to abort the actual network request
+        // and instantly resolve with the cached data
+        config.adapter = () => {
+          return Promise.resolve({
+            data: cached.data,
+            status: 200,
+            statusText: 'OK',
+            headers: cached.headers,
+            config,
+            request: {}
+          });
+        };
+      }
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
 );
 
+// Interceptor 2: Response Handling & Cache Save
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Save successful GET requests to cache
+    if (response.config.method?.toLowerCase() === 'get' && !response.config.url?.includes('/auth')) {
+      const cacheKey = `${response.config.url}?${new URLSearchParams(response.config.params || {}).toString()}`;
+      getCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: response.data,
+        headers: response.headers
+      });
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
