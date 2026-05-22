@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, Camera, MessageSquare, Mail, Phone, MapPin, Leaf } from 'lucide-react';
-
+import gbMap from '../assets/gbmap.jpg';
 
 const Footer = () => {
   return (
@@ -19,7 +19,7 @@ const Footer = () => {
             </p>
             <div className="social-links">
               <a href="#"><Globe size={20} /></a>
-              <a href="#">< Camera size={20} /></a>
+              <a href="#"><Camera size={20} /></a>
               <a href="#"><MessageSquare size={20} /></a>
             </div>
           </div>
@@ -39,10 +39,11 @@ const Footer = () => {
           <div className="footer-links">
             <h3>Categories</h3>
             <ul>
-              <li><Link to="/shop?cat=fruits">Dried Fruits</Link></li>
-              <li><Link to="/shop?cat=nuts">Premium Nuts</Link></li>
-              <li><Link to="/shop?cat=herbs">Natural Herbs</Link></li>
-              <li><Link to="/shop?cat=snacks">Healthy Snacks</Link></li>
+              <li><Link to="/shop?cat=dry-fruits">Dry Fruits</Link></li>
+              <li><Link to="/shop?cat=seasonal-fruits">Fresh Seasonal Fruits</Link></li>
+              <li><Link to="/shop?cat=natural-herbs">Natural Herbs</Link></li>
+              <li><Link to="/shop?cat=organic-products">Organic & Herbal Products</Link></li>
+              <li><Link to="/shop?cat=handicrafts">Handicrafts</Link></li>
             </ul>
           </div>
 
@@ -62,6 +63,18 @@ const Footer = () => {
               <span>inamkarim96@gmail.com</span>
             </div>
           </div>
+
+          {/* Map/Origin Section */}
+          <div className="footer-map-section">
+            <h3>Our Origin</h3>
+            <div className="footer-map-container">
+              <img src={gbMap} alt="Gilgit Baltistan Map" className="footer-map-img" />
+              <div className="footer-map-overlay">
+                <span className="footer-map-tag">Gilgit-Baltistan</span>
+              </div>
+            </div>
+            <p className="footer-map-text"> Products brought directly from Gilgit-Baltistan</p>
+          </div>
         </div>
 
         <div className="footer-bottom">
@@ -72,8 +85,6 @@ const Footer = () => {
           </div>
         </div>
       </div>
-
-
     </footer>
   );
 };
