@@ -54,109 +54,120 @@ function mapProduct(row, reviewMap) {
 }
 
 
-async function listProducts(filters) {
-  const page = Number(filters.page || 1);
-  const limit = Number(filters.limit || 10);
-  const skip = (page - 1) * limit;
+async function getAllProductsFromDB() {
+  const cacheKey = "products:all_active";
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
 
-  const where = { is_active: true };
-
-  // Search by name or description
-  if (filters.q) {
-    where.OR = [
-      { name: { contains: filters.q, mode: 'insensitive' } },
-      { description: { contains: filters.q, mode: 'insensitive' } }
-    ];
-  }
-
-  // Filter by category slug
-  if (filters.category) {
-    where.categories = { slug: filters.category };
-  }
-
-  // Filter by price range
-  if (filters.min_price !== undefined || filters.max_price !== undefined) {
-    where.base_price = {};
-    if (filters.min_price !== undefined) {
-      where.base_price.gte = filters.min_price;
-    }
-    if (filters.max_price !== undefined) {
-      where.base_price.lte = filters.max_price;
-    }
-  }
-
-  // Filter by featured
-  if (filters.featuredOnly) {
-    where.is_featured = true;
-  }
-
-  // Filter by weight variant
-  if (filters.weight_label || filters.min_weight || filters.max_weight) {
-    where.weight_variants = {
-      some: {
-        AND: [
-          filters.weight_label ? { label: { contains: filters.weight_label, mode: 'insensitive' } } : {},
-          filters.min_weight ? { weight_grams: { gte: parseInt(filters.min_weight) } } : {},
-          filters.max_weight ? { weight_grams: { lte: parseInt(filters.max_weight) } } : {}
-        ].filter(Boolean)
+  const rows = await prisma.products.findMany({
+    where: { is_active: true },
+    select: {
+      id: true,
+      category_id: true,
+      name: true,
+      slug: true,
+      description: true,
+      base_price: true,
+      stock: true,
+      images: true,
+      is_featured: true,
+      is_active: true,
+      created_at: true,
+      updated_at: true,
+      categories: true,
+      weight_variants: {
+        orderBy: { weight_grams: "asc" }
       }
-    };
-  }
-
-  // Filter by stock availability
-  if (filters.in_stock) {
-    where.stock = { gt: 0 };
-  }
-
-  let orderBy = { created_at: "desc" };
-  if (filters.sort === "price_asc") {
-    orderBy = { base_price: "asc" };
-  } else if (filters.sort === "price_desc") {
-    orderBy = { base_price: "desc" };
-  } else if (filters.sort === "popular") {
-    orderBy = { reviews: { _count: "desc" } };
-  } else if (filters.sort === "name_asc") {
-    orderBy = { name: "asc" };
-  }
-
-  // Generate cache key based on filters
-  const cacheKey = `products:list:${JSON.stringify(filters)}`;
-  const cachedData = await cache.get(cacheKey);
-  if (cachedData) return cachedData;
-
-  const [total, rows] = await Promise.all([
-    prisma.products.count({ where }),
-    prisma.products.findMany({
-      where,
-      select: {
-        id: true,
-        category_id: true,
-        name: true,
-        slug: true,
-        base_price: true,
-        stock: true,
-        images: true,
-        is_featured: true,
-        is_active: true,
-        created_at: true,
-        updated_at: true,
-        categories: true,
-        weight_variants: {
-          orderBy: { weight_grams: "asc" }
-        }
-      },
-      orderBy,
-      take: limit,
-      skip
-    })
-  ]);
+    }
+  });
 
   const productIds = rows.map((row) => row.id);
   const reviewMap = await fetchReviewStatsByProductIds(productIds);
 
   const products = rows.map((row) => mapProduct(row, reviewMap));
+  
+  await cache.set(cacheKey, products, "EX", 3600); // Cache for 1 hour
+  return products;
+}
+
+async function listProducts(filters) {
+  const cacheKey = `products:list:${JSON.stringify(filters)}`;
+  const cachedData = await cache.get(cacheKey);
+  if (cachedData) return cachedData;
+
+  const allProducts = await getAllProductsFromDB();
+  
+  let filtered = [...allProducts];
+
+  // Apply Search
+  if (filters.q) {
+    const q = filters.q.toLowerCase();
+    filtered = filtered.filter(p => 
+      (p.name && p.name.toLowerCase().includes(q)) || 
+      (p.description && p.description.toLowerCase().includes(q))
+    );
+  }
+
+  // Filter by Category
+  if (filters.category) {
+    filtered = filtered.filter(p => p.categories && p.categories.slug === filters.category);
+  }
+
+  // Filter by Price Range
+  if (filters.min_price !== undefined) {
+    filtered = filtered.filter(p => Number(p.base_price) >= Number(filters.min_price));
+  }
+  if (filters.max_price !== undefined) {
+    filtered = filtered.filter(p => Number(p.base_price) <= Number(filters.max_price));
+  }
+
+  // Filter by Featured
+  if (filters.featuredOnly) {
+    filtered = filtered.filter(p => p.is_featured === true);
+  }
+
+  // Filter by Stock
+  if (filters.in_stock) {
+    filtered = filtered.filter(p => p.stock > 0);
+  }
+
+  // Filter by Weight Variants
+  if (filters.weight_label || filters.min_weight || filters.max_weight) {
+    filtered = filtered.filter(p => {
+      if (!p.weight_variants) return false;
+      return p.weight_variants.some(w => {
+        let match = true;
+        if (filters.weight_label && !w.label.toLowerCase().includes(filters.weight_label.toLowerCase())) match = false;
+        if (filters.min_weight && w.weight_grams < parseInt(filters.min_weight)) match = false;
+        if (filters.max_weight && w.weight_grams > parseInt(filters.max_weight)) match = false;
+        return match;
+      });
+    });
+  }
+
+  // Apply Sorting
+  if (filters.sort === "price_asc") {
+    filtered.sort((a, b) => Number(a.base_price) - Number(b.base_price));
+  } else if (filters.sort === "price_desc") {
+    filtered.sort((a, b) => Number(b.base_price) - Number(a.base_price));
+  } else if (filters.sort === "popular") {
+    filtered.sort((a, b) => Number(b.review_count || 0) - Number(a.review_count || 0));
+  } else if (filters.sort === "name_asc") {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    // Default to newest
+    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  const total = filtered.length;
+  const page = Number(filters.page || 1);
+  const limit = Number(filters.limit || 10);
+  const skip = (page - 1) * limit;
+
+  const paginated = filtered.slice(skip, skip + limit);
+
   const result = {
-    products,
+    products: paginated,
     pagination: {
       page,
       limit,
@@ -165,7 +176,6 @@ async function listProducts(filters) {
     }
   };
 
-  // Cache the result for 60s (or 120s if featured)
   const ttl = filters.featuredOnly ? 120 : 60;
   await cache.set(cacheKey, result, "EX", ttl);
 
@@ -289,6 +299,15 @@ async function getProductById(id, includeInactive = false) {
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
+  if (!includeInactive) {
+    const allProducts = await getAllProductsFromDB();
+    const found = allProducts.find(p => p.id === id);
+    if (found) {
+      await cache.set(cacheKey, found, "EX", 300);
+      return found;
+    }
+  }
+
   const result = await _getProductByIdWithClient(prisma, id, includeInactive);
   await cache.set(cacheKey, result, "EX", 300);
   return result;
@@ -298,6 +317,13 @@ async function getProductBySlug(slug) {
   const cacheKey = `product:slug:${slug}`;
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
+
+  const allProducts = await getAllProductsFromDB();
+  const found = allProducts.find(p => p.slug === slug);
+  if (found) {
+    await cache.set(cacheKey, found, "EX", 300);
+    return found;
+  }
 
   const row = await prisma.products.findUnique({
     where: { slug, is_active: true },
@@ -348,6 +374,7 @@ async function createProduct(payload) {
       }
     });
 
+    await cache.del("products:all_active");
     await cache.clearPattern("products:list");
     return _getProductByIdWithClient(tx, product.id, true);
   });
@@ -473,13 +500,16 @@ async function updateStock(id, stock) {
 
 async function deleteProduct(id) {
   try {
+    const existing = await prisma.products.findUnique({ where: { id } });
     await prisma.products.delete({
       where: { id }
     });
     await Promise.all([
+      cache.del("products:all_active"),
       cache.clearPattern("products:list"),
       cache.clearPattern("products:admin:list"),
-      cache.clearPattern(`product:id:${id}`)
+      cache.clearPattern(`product:id:${id}`),
+      existing ? cache.del(`product:slug:${existing.slug}`) : Promise.resolve()
     ]);
   } catch (err) {
     if (err.code === "P2025") {
@@ -509,6 +539,7 @@ async function appendProductImage(id, imageUrl) {
 }
 
 module.exports = {
+  getAllProductsFromDB,
   listProducts,
   listAdminProducts,
   getFeaturedProducts,
