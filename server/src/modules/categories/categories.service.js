@@ -70,13 +70,15 @@ async function listCategories() {
 }
 
 async function getCategoryById(id) {
-  const category = await prisma.categories.findUnique({
-    where: { id }
+  return cache.getOrSet(`category:id:${id}`, 60, async () => {
+    const category = await prisma.categories.findUnique({
+      where: { id }
+    });
+    if (!category) {
+      throw new ApiError(404, "Category not found", "CATEGORY_NOT_FOUND");
+    }
+    return category;
   });
-  if (!category) {
-    throw new ApiError(404, "Category not found", "CATEGORY_NOT_FOUND");
-  }
-  return category;
 }
 
 async function createCategory(payload) {

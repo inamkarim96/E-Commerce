@@ -191,7 +191,7 @@ async function listAdminProducts(filters) {
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
-  const [total, rows] = await Promise.all([
+  const [total, rows] = await prisma.$transaction([
     prisma.products.count(),
     prisma.products.findMany({
       include: {
@@ -234,6 +234,10 @@ async function searchProducts({ q, page, limit }) {
   const limitNum = Number(limit || 10);
   const skip = (pageNum - 1) * limitNum;
 
+  const cacheKey = `products:search:${q}:${pageNum}:${limitNum}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
+
   const where = {
     is_active: true,
     OR: [
@@ -261,7 +265,7 @@ async function searchProducts({ q, page, limit }) {
   const ids = rows.map((row) => row.id);
   const reviewMap = await fetchReviewStatsByProductIds(ids);
 
-  return {
+  const result = {
     products: rows.map((row) => mapProduct(row, reviewMap)),
     pagination: {
       page: pageNum,
@@ -270,6 +274,9 @@ async function searchProducts({ q, page, limit }) {
       pages: total === 0 ? 0 : Math.ceil(total / limitNum)
     }
   };
+
+  await cache.set(cacheKey, result, "EX", 30);
+  return result;
 }
 
 async function _getProductByIdWithClient(client, id, includeInactive = false) {
@@ -376,6 +383,7 @@ async function createProduct(payload) {
 
     await cache.del("products:all_active");
     await cache.clearPattern("products:list");
+    await cache.clearPattern("products:search");
     return _getProductByIdWithClient(tx, product.id, true);
   });
 }
@@ -508,6 +516,7 @@ async function deleteProduct(id) {
       cache.del("products:all_active"),
       cache.clearPattern("products:list"),
       cache.clearPattern("products:admin:list"),
+      cache.clearPattern("products:search"),
       cache.clearPattern(`product:id:${id}`),
       existing ? cache.del(`product:slug:${existing.slug}`) : Promise.resolve()
     ]);

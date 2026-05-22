@@ -7,11 +7,13 @@ const { globalLimiter, authLimiter } = require("./middleware/rateLimiter");
 
 const { FRONTEND_URL } = require("./config/env");
 const requestLogger = require("./middleware/requestLogger");
+const responseTime = require("./middleware/responseTime");
 const errorHandler = require("./middleware/errorHandler");
 const apiV1Router = require("./routes");
 
 const app = express();
 
+app.use(responseTime);
 app.use(compression());
 app.use(
   helmet({

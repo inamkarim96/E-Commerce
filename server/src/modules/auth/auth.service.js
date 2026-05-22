@@ -161,7 +161,17 @@ async function login(payload) {
 
   const user = await prisma.users.findUnique({
     where: { email: payload.email },
-    include: { addresses: { where: { is_default: true } } }
+    select: {
+      id: true,
+      email: true,
+      password_hash: true,
+      name: true,
+      role: true,
+      is_active: true,
+      firebase_uid: true,
+      locked_until: true,
+      failed_login_attempts: true
+    }
   });
   if (!user) {
     throw new ApiError(401, "Invalid email or password", "INVALID_CREDENTIALS");
@@ -223,10 +233,11 @@ async function login(payload) {
 
   // Sync UID
   if (!user.firebase_uid) {
-    user = await prisma.users.update({
+    await prisma.users.update({
       where: { id: user.id },
       data: { firebase_uid: firebaseUser.uid }
     });
+    user.firebase_uid = firebaseUser.uid;
   }
 
   // Customer 2FA: Only require if not already verified

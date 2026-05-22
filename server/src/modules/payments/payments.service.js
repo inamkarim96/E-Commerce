@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
 const jazzcashService = require("./jazzcash.service");
 const stripeService = require("./stripe.service");
@@ -137,6 +138,8 @@ async function handleJazzcashWebhook(data) {
       }
     });
 
+    if (cache) await cache.del(`payment:status:${orderId}`);
+
     if (isSuccess && order.status === "pending") {
       await tx.orders.update({
         where: { id: order.id },
@@ -181,6 +184,8 @@ async function handleStripeWebhook(event) {
         }
       });
 
+      if (cache) await cache.del(`payment:status:${orderId}`);
+
       if (order.status === "pending") {
         await tx.orders.update({
           where: { id: order.id },
@@ -215,31 +220,34 @@ async function handleStripeWebhook(event) {
 }
 
 async function getPaymentStatus(userId, orderId) {
-  const order = await prisma.orders.findUnique({
-    where: { id: orderId },
-    include: { payments: true }
+  const cacheKey = `payment:status:${orderId}`;
+  return cache.getOrSet(cacheKey, 10, async () => {
+    const order = await prisma.orders.findUnique({
+      where: { id: orderId },
+      include: { payments: true }
+    });
+
+    if (!order) {
+      throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
+    }
+
+    if (order.user_id !== userId) {
+      throw new ApiError(403, "Not authorized", "FORBIDDEN");
+    }
+
+    if (!order.payments) {
+      throw new ApiError(404, "Payment not found", "PAYMENT_NOT_FOUND");
+    }
+
+    return {
+      order_id: order.id,
+      order_status: order.status,
+      payment_status: order.payments.status,
+      payment_method: order.payments.gateway,
+      transaction_id: order.payments.transaction_id,
+      paid_at: order.payments.paid_at
+    };
   });
-
-  if (!order) {
-    throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
-  }
-
-  if (order.user_id !== userId) {
-    throw new ApiError(403, "Not authorized", "FORBIDDEN");
-  }
-
-  if (!order.payments) {
-    throw new ApiError(404, "Payment not found", "PAYMENT_NOT_FOUND");
-  }
-
-  return {
-    order_id: order.id,
-    order_status: order.status,
-    payment_status: order.payments.status,
-    payment_method: order.payments.gateway,
-    transaction_id: order.payments.transaction_id,
-    paid_at: order.payments.paid_at
-  };
 }
 
 async function adminRefund(orderId) {
@@ -308,6 +316,8 @@ async function handleJazzcashCallback(data) {
           updated_at: new Date()
         }
       });
+
+      if (cache) await cache.del(`payment:status:${orderId}`);
 
       if (isSuccess && order.status === "pending") {
         await tx.orders.update({

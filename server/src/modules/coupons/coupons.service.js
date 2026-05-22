@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
 
 function toNumber(value) {
@@ -6,7 +7,9 @@ function toNumber(value) {
 }
 
 async function validateCoupon(code, subtotal) {
-  const coupon = await prisma.coupons.findUnique({ where: { code } });
+  const coupon = await cache.getOrSet(`coupon:code:${code}`, 30, () =>
+    prisma.coupons.findUnique({ where: { code } })
+  );
 
   if (!coupon) {
     return { valid: false, reason: "Invalid coupon code" };
@@ -46,9 +49,11 @@ async function validateCoupon(code, subtotal) {
 }
 
 async function listAllCoupons() {
-  return prisma.coupons.findMany({
-    orderBy: { created_at: "desc" }
-  });
+  return cache.getOrSet("coupons:all", 120, () =>
+    prisma.coupons.findMany({
+      orderBy: { created_at: "desc" }
+    })
+  );
 }
 
 async function createCoupon(data) {
@@ -57,23 +62,30 @@ async function createCoupon(data) {
     throw new ApiError(409, "Coupon code already exists", "DUPLICATE_COUPON");
   }
 
-  return prisma.coupons.create({
+  const result = await prisma.coupons.create({
     data: {
       ...data,
       created_at: new Date()
     }
   });
+  await cache.del("coupons:all");
+  return result;
 }
 
 async function updateCoupon(id, data) {
   try {
-    return await prisma.coupons.update({
+    const result = await prisma.coupons.update({
       where: { id },
       data: {
         ...data,
         updated_at: new Date()
       }
     });
+    await Promise.all([
+      cache.del("coupons:all"),
+      cache.clearPattern("coupon:code:")
+    ]);
+    return result;
   } catch (err) {
     if (err.code === "P2025") {
       throw new ApiError(404, "Coupon not found", "NOT_FOUND");
@@ -84,13 +96,18 @@ async function updateCoupon(id, data) {
 
 async function deactivateCoupon(id) {
   try {
-    return await prisma.coupons.update({
+    const result = await prisma.coupons.update({
       where: { id },
       data: {
         is_active: false,
         updated_at: new Date()
       }
     });
+    await Promise.all([
+      cache.del("coupons:all"),
+      cache.clearPattern("coupon:code:")
+    ]);
+    return result;
   } catch (err) {
     if (err.code === "P2025") {
       throw new ApiError(404, "Coupon not found", "NOT_FOUND");

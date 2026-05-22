@@ -1,5 +1,6 @@
 const sgMail = require("@sendgrid/mail");
 const prisma = require("../../config/prisma");
+const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
 const { SENDGRID_API_KEY, SENDGRID_FROM_EMAIL } = require("../../config/env");
 
@@ -30,26 +31,8 @@ function sendOrderEmailAsync({ to, subject, text, html }) {
     .catch((error) => console.error("Order email send failed:", error?.message || error));
 }
 
-async function fetchOrderItems(orderId, client = prisma) {
-  return client.order_items.findMany({
-    where: { order_id: orderId },
-    include: {
-      products: {
-        select: { slug: true }
-      },
-      weight_variants: {
-        select: { label: true }
-      }
-    },
-    orderBy: { id: "asc" }
-  }).then(items => items.map(item => ({
-    ...item,
-    product_slug: item.products?.slug,
-    variant_label: item.weight_variants?.label
-  })));
-}
-
 async function fetchOrderById(orderId, client = prisma) {
+  // Single query with all relations included — eliminates N+1 pattern
   const order = await client.orders.findUnique({
     where: { id: orderId },
     include: {
@@ -57,6 +40,17 @@ async function fetchOrderById(orderId, client = prisma) {
         select: { name: true, email: true }
       },
       payments: true,
+      order_items: {
+        include: {
+          products: {
+            select: { slug: true }
+          },
+          weight_variants: {
+            select: { label: true }
+          }
+        },
+        orderBy: { id: "asc" }
+      },
       order_history: {
         include: {
           users: {
@@ -72,7 +66,11 @@ async function fetchOrderById(orderId, client = prisma) {
     throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
   }
 
-  const items = await fetchOrderItems(order.id, client);
+  const items = order.order_items.map(item => ({
+    ...item,
+    product_slug: item.products?.slug,
+    variant_label: item.weight_variants?.label
+  }));
 
   return {
     ...order,
@@ -97,6 +95,10 @@ async function listOwnOrders(userId, { page, limit }) {
   const limitNum = Number(limit || 10);
   const skip = (pageNum - 1) * limitNum;
 
+  const cacheKey = `orders:own:${userId}:${pageNum}:${limitNum}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
+
   const [total, rows] = await prisma.$transaction([
     prisma.orders.count({ where: { user_id: userId } }),
     prisma.orders.findMany({
@@ -113,7 +115,7 @@ async function listOwnOrders(userId, { page, limit }) {
     })
   ]);
 
-  return {
+  const result = {
     orders: rows.map(r => ({
       ...r,
       items_count: r._count.order_items
@@ -125,6 +127,9 @@ async function listOwnOrders(userId, { page, limit }) {
       pages: total === 0 ? 0 : Math.ceil(total / limitNum)
     }
   };
+
+  await cache.set(cacheKey, result, "EX", 15);
+  return result;
 }
 
 async function getOwnOrder(userId, orderId) {
@@ -168,6 +173,13 @@ async function validateCoupon(couponCode, subtotal) {
   if (discount > subtotal) discount = subtotal;
 
   return { discount, coupon };
+}
+
+function invalidateOrderCaches(userId) {
+  return Promise.all([
+    cache.clearPattern(`orders:own:${userId}`),
+    cache.clearPattern("orders:admin:")
+  ]);
 }
 
 async function createOrderFromCart(userId, payload) {
@@ -306,6 +318,9 @@ async function createOrderFromCart(userId, payload) {
     timeout: 20000
   });
 
+  // Invalidate caches after successful order creation
+  await invalidateOrderCaches(userId);
+
   const order = await fetchOrderById(result.orderId);
 
   sendOrderEmailAsync({
@@ -323,7 +338,7 @@ async function createOrderFromCart(userId, payload) {
 
 async function cancelOwnOrder(userId, orderId) {
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const order = await tx.orders.findUnique({
         where: { id: orderId }
       });
@@ -359,6 +374,9 @@ async function cancelOwnOrder(userId, orderId) {
       maxWait: 5000,
       timeout: 20000
     });
+
+    await invalidateOrderCaches(userId);
+    return result;
   } catch (error) {
     console.error(`[cancelOwnOrder ERROR] Order: ${orderId}, User: ${userId}`, error);
     throw error;
@@ -369,6 +387,10 @@ async function listAdminOrders(filters) {
   const page = Number(filters.page || 1);
   const limit = Number(filters.limit || 10);
   const skip = (page - 1) * limit;
+
+  const cacheKey = `orders:admin:${JSON.stringify(filters)}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
 
   const where = {};
   if (filters.status) where.status = filters.status;
@@ -400,7 +422,7 @@ async function listAdminOrders(filters) {
     })
   ]);
 
-  return {
+  const result = {
     orders: rows.map(r => ({
       ...r,
       user_name: r.users?.name,
@@ -414,10 +436,13 @@ async function listAdminOrders(filters) {
       pages: total === 0 ? 0 : Math.ceil(total / limit)
     }
   };
+
+  await cache.set(cacheKey, result, "EX", 30);
+  return result;
 }
 
 async function updateOrderStatusByAdmin(orderId, payload, adminId) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const order = await tx.orders.findUnique({ where: { id: orderId } });
     if (!order) {
       throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
@@ -459,6 +484,14 @@ async function updateOrderStatusByAdmin(orderId, payload, adminId) {
 
     return fetchOrderById(orderId, tx);
   });
+
+  // Invalidate caches
+  await Promise.all([
+    cache.clearPattern(`orders:own:`),
+    cache.clearPattern("orders:admin:")
+  ]);
+
+  return result;
 }
 
 async function getAdminOrder(orderId) {
@@ -486,7 +519,7 @@ async function deleteOwnOrder(userId, orderId) {
     throw new ApiError(400, "Only cancelled or delivered orders can be deleted from history", "INVALID_ORDER_STATE");
   }
 
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Delete payments first because of foreign key constraint
     await tx.payments.deleteMany({
       where: { order_id: orderId }
@@ -498,6 +531,9 @@ async function deleteOwnOrder(userId, orderId) {
 
     return { success: true };
   });
+
+  await invalidateOrderCaches(userId);
+  return result;
 }
 
 module.exports = {

@@ -20,35 +20,37 @@ async function updateProductRatingCache(productId) {
 async function getProductReviews(productId, { page = 1, limit = 10 }) {
   const skip = (page - 1) * limit;
 
-  const [reviews, stats] = await prisma.$transaction([
-    prisma.reviews.findMany({
-      where: { product_id: productId },
-      include: {
-        users: { select: { name: true } }
-      },
-      orderBy: { created_at: "desc" },
-      take: limit,
-      skip
-    }),
-    prisma.reviews.aggregate({
-      where: { product_id: productId },
-      _avg: { rating: true },
-      _count: { id: true }
-    })
-  ]);
+  return cache.getOrSet(`reviews:${productId}:${page}:${limit}`, 60, async () => {
+    const [reviews, stats] = await prisma.$transaction([
+      prisma.reviews.findMany({
+        where: { product_id: productId },
+        include: {
+          users: { select: { name: true } }
+        },
+        orderBy: { created_at: "desc" },
+        take: parseInt(limit),
+        skip
+      }),
+      prisma.reviews.aggregate({
+        where: { product_id: productId },
+        _avg: { rating: true },
+        _count: { id: true }
+      })
+    ]);
 
-  return {
-    reviews: reviews.map(r => ({
-      ...r,
-      user_name: r.users?.name
-    })),
-    avg_rating: parseFloat(stats._avg.rating || 0).toFixed(1),
-    total_count: stats._count.id,
-    pagination: {
-      page: parseInt(page),
-      limit: parseInt(limit)
-    }
-  };
+    return {
+      reviews: reviews.map(r => ({
+        ...r,
+        user_name: r.users?.name
+      })),
+      avg_rating: parseFloat(stats._avg.rating || 0).toFixed(1),
+      total_count: stats._count.id,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit)
+      }
+    };
+  });
 }
 
 async function createReview(userId, { product_id, rating, title, body }) {
@@ -93,7 +95,10 @@ async function createReview(userId, { product_id, rating, title, body }) {
   });
 
   // Recalculate and cache
-  await updateProductRatingCache(product_id);
+  await Promise.all([
+    updateProductRatingCache(product_id),
+    cache.clearPattern(`reviews:${product_id}:`)
+  ]);
 
   return review;
 }

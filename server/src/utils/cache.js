@@ -29,6 +29,30 @@ const cache = {
     }
     return count;
   },
+
+  /**
+   * Cache-aside helper: returns cached value or calls fetchFn, caches result.
+   * Eliminates boilerplate get/set pattern in services.
+   * @param {string} key - Cache key
+   * @param {number} ttl - TTL in seconds
+   * @param {Function} fetchFn - Async function to fetch data on cache miss
+   */
+  async getOrSet(key, ttl, fetchFn) {
+    const cached = cacheStore.get(key);
+    if (cached !== undefined) return cached;
+    const result = await fetchFn();
+    cacheStore.set(key, result, ttl);
+    return result;
+  },
+
+  /**
+   * Delete multiple keys at once (batch invalidation).
+   * @param {string[]} keys - Array of cache keys to delete
+   */
+  async delMulti(keys) {
+    return cacheStore.del(keys);
+  },
+
   on: () => {},
   once: () => {},
   status: "ready"

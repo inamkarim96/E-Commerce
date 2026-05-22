@@ -39,50 +39,52 @@ async function fetchVariantForCart(productId, variantId) {
 }
 
 async function getCartByUserId(userId) {
-  const items = await prisma.cart_items.findMany({
-    where: {
-      user_id: userId,
-      products: { is_active: true }
-    },
-    include: {
-      products: { select: { id: true, name: true, images: true } },
-      weight_variants: { select: { id: true, label: true, price: true } }
-    },
-    orderBy: { created_at: "desc" }
-  });
+  return cache.getOrSet(`cart:user:${userId}`, 10, async () => {
+    const items = await prisma.cart_items.findMany({
+      where: {
+        user_id: userId,
+        products: { is_active: true }
+      },
+      include: {
+        products: { select: { id: true, name: true, images: true } },
+        weight_variants: { select: { id: true, label: true, price: true } }
+      },
+      orderBy: { created_at: "desc" }
+    });
 
-  let subtotal = 0;
-  let itemCount = 0;
+    let subtotal = 0;
+    let itemCount = 0;
 
-  const mappedItems = items.map((ci) => {
-    const unitPrice = toNumber(ci.weight_variants.price);
-    const quantity = toNumber(ci.quantity);
-    const itemTotal = unitPrice * quantity;
-    subtotal += itemTotal;
-    itemCount += quantity;
+    const mappedItems = items.map((ci) => {
+      const unitPrice = toNumber(ci.weight_variants.price);
+      const quantity = toNumber(ci.quantity);
+      const itemTotal = unitPrice * quantity;
+      subtotal += itemTotal;
+      itemCount += quantity;
+
+      return {
+        id: ci.id,
+        product: {
+          id: ci.products.id,
+          name: ci.products.name,
+          image: ci.products.images?.[0] || null
+        },
+        variant: {
+          id: ci.weight_variants.id,
+          label: ci.weight_variants.label,
+          price: unitPrice
+        },
+        quantity,
+        item_total: itemTotal
+      };
+    });
 
     return {
-      id: ci.id,
-      product: {
-        id: ci.products.id,
-        name: ci.products.name,
-        image: ci.products.images?.[0] || null
-      },
-      variant: {
-        id: ci.weight_variants.id,
-        label: ci.weight_variants.label,
-        price: unitPrice
-      },
-      quantity,
-      item_total: itemTotal
+      items: mappedItems,
+      subtotal,
+      item_count: itemCount
     };
   });
-
-  return {
-    items: mappedItems,
-    subtotal,
-    item_count: itemCount
-  };
 }
 
 async function addItem(userId, payload) {
@@ -129,6 +131,7 @@ async function addItem(userId, payload) {
       });
     }
 
+    if (cache) await cache.del(`cart:user:${userId}`);
     return getCartByUserId(userId);
   });
 }
@@ -149,6 +152,7 @@ async function updateItemQuantity(userId, itemId, quantity) {
 
     if (quantity === 0) {
       await tx.cart_items.delete({ where: { id: itemId } });
+      if (cache) await cache.del(`cart:user:${userId}`);
       return getCartByUserId(userId);
     }
 
@@ -164,6 +168,7 @@ async function updateItemQuantity(userId, itemId, quantity) {
       }
     });
 
+    if (cache) await cache.del(`cart:user:${userId}`);
     return getCartByUserId(userId);
   });
 }
@@ -172,6 +177,7 @@ async function removeItem(userId, itemId) {
   await prisma.cart_items.deleteMany({
     where: { id: itemId, user_id: userId }
   });
+  if (cache) await cache.del(`cart:user:${userId}`);
   return getCartByUserId(userId);
 }
 
@@ -179,6 +185,7 @@ async function clearCart(userId) {
   await prisma.cart_items.deleteMany({
     where: { user_id: userId }
   });
+  if (cache) await cache.del(`cart:user:${userId}`);
   return getCartByUserId(userId);
 }
 
@@ -238,6 +245,7 @@ async function mergeGuestCart(userId, sessionId) {
         });
       }
     }
+    if (cache) await cache.del(`cart:user:${userId}`);
     return getCartByUserId(userId);
   });
 }

@@ -5,41 +5,43 @@ const ApiError = require("../../utils/apiError");
 const { auth: firebaseAuth } = require("../../config/firebase");
 
 async function getProfile(userId) {
-  const user = await prisma.users.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      role: true,
-      email_verified: true,
-      is_active: true,
-      created_at: true,
-      addresses: {
-        orderBy: [
-          { is_default: "desc" },
-          { created_at: "desc" }
-        ]
+  return cache.getOrSet(`user:profile:${userId}`, 30, async () => {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        email_verified: true,
+        is_active: true,
+        created_at: true,
+        addresses: {
+          orderBy: [
+            { is_default: "desc" },
+            { created_at: "desc" }
+          ]
+        }
       }
-    }
-  });
-
-  if (!user) {
-    throw new ApiError(404, "User not found", "USER_NOT_FOUND");
-  }
-
-  // Admin Role Sync Fallback
-  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
-  if (user.email.toLowerCase().trim() === adminEmail && user.role !== "admin") {
-    await prisma.users.update({
-      where: { id: user.id },
-      data: { role: "admin" }
     });
-    user.role = "admin";
-  }
 
-  return user;
+    if (!user) {
+      throw new ApiError(404, "User not found", "USER_NOT_FOUND");
+    }
+
+    // Admin Role Sync Fallback
+    const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+    if (user.email.toLowerCase().trim() === adminEmail && user.role !== "admin") {
+      await prisma.users.update({
+        where: { id: user.id },
+        data: { role: "admin" }
+      });
+      user.role = "admin";
+    }
+
+    return user;
+  });
 }
 
 async function updateProfile(userId, payload) {
@@ -60,6 +62,10 @@ async function updateProfile(userId, payload) {
         updated_at: new Date()
       }
     });
+    await Promise.all([
+      cache.del(`user:profile:${userId}`),
+      cache.clearPattern("users:admin:list:")
+    ]);
   }
   return getProfile(userId);
 }
@@ -98,18 +104,23 @@ async function changePassword(userId, currentPassword, newPassword) {
   }
 
   if (cache) {
-    await cache.del(`refresh:${userId}`);
+    await Promise.all([
+      cache.del(`refresh:${userId}`),
+      cache.del(`user:profile:${userId}`)
+    ]);
   }
 }
 
 async function getAddresses(userId) {
-  return prisma.addresses.findMany({
-    where: { user_id: userId },
-    orderBy: [
-      { is_default: "desc" },
-      { created_at: "desc" }
-    ]
-  });
+  return cache.getOrSet(`user:addresses:${userId}`, 30, () =>
+    prisma.addresses.findMany({
+      where: { user_id: userId },
+      orderBy: [
+        { is_default: "desc" },
+        { created_at: "desc" }
+      ]
+    })
+  );
 }
 
 async function addAddress(userId, payload) {
@@ -128,6 +139,12 @@ async function addAddress(userId, payload) {
       }
     });
   });
+
+  await Promise.all([
+    cache.del(`user:addresses:${userId}`),
+    cache.del(`user:profile:${userId}`)
+  ]);
+  return result;
 }
 
 async function updateAddress(userId, addressId, payload) {
@@ -154,6 +171,12 @@ async function updateAddress(userId, addressId, payload) {
       }
     });
   });
+
+  await Promise.all([
+    cache.del(`user:addresses:${userId}`),
+    cache.del(`user:profile:${userId}`)
+  ]);
+  return result;
 }
 
 async function deleteAddress(userId, addressId) {
@@ -168,6 +191,10 @@ async function deleteAddress(userId, addressId) {
     await prisma.addresses.delete({
       where: { id: addressId }
     });
+    await Promise.all([
+      cache.del(`user:addresses:${userId}`),
+      cache.del(`user:profile:${userId}`)
+    ]);
   } catch (err) {
     // Prisma Foreign Key violation error code for Postgres
     if (err.code === "P2003") {
@@ -180,6 +207,10 @@ async function deleteAddress(userId, addressId) {
 async function listUsers(query) {
   const { page, limit, role } = query;
   const skip = (page - 1) * limit;
+
+  const cacheKey = `users:admin:list:${JSON.stringify(query)}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return cached;
 
   const where = {};
   if (role) {
@@ -206,7 +237,7 @@ async function listUsers(query) {
     })
   ]);
 
-  return {
+  const result = {
     users,
     pagination: {
       page,
@@ -215,6 +246,9 @@ async function listUsers(query) {
       pages: total === 0 ? 0 : Math.ceil(total / limit)
     }
   };
+
+  await cache.set(cacheKey, result, "EX", 30);
+  return result;
 }
 
 async function getUserDetails(userId) {
@@ -262,6 +296,11 @@ async function updateUserStatus(userId, isActive) {
         role: true
       }
     });
+
+    await Promise.all([
+      cache.del(`user:profile:${userId}`),
+      cache.clearPattern("users:admin:list:")
+    ]);
 
     return user;
   } catch (err) {
