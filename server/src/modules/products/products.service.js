@@ -95,79 +95,111 @@ async function listProducts(filters) {
   const cachedData = await cache.get(cacheKey);
   if (cachedData) return cachedData;
 
-  const allProducts = await getAllProductsFromDB();
-  
-  let filtered = [...allProducts];
+  const where = { is_active: true };
 
   // Apply Search
   if (filters.q) {
     const q = filters.q.toLowerCase();
-    filtered = filtered.filter(p => 
-      (p.name && p.name.toLowerCase().includes(q)) || 
-      (p.description && p.description.toLowerCase().includes(q))
-    );
+    where.OR = [
+      { name: { contains: q, mode: 'insensitive' } },
+      { description: { contains: q, mode: 'insensitive' } }
+    ];
   }
 
   // Filter by Category
   if (filters.category) {
-    filtered = filtered.filter(p => p.categories && p.categories.slug === filters.category);
+    where.categories = { slug: filters.category };
   }
 
   // Filter by Price Range
-  if (filters.min_price !== undefined) {
-    filtered = filtered.filter(p => Number(p.base_price) >= Number(filters.min_price));
-  }
-  if (filters.max_price !== undefined) {
-    filtered = filtered.filter(p => Number(p.base_price) <= Number(filters.max_price));
+  if (filters.min_price !== undefined || filters.max_price !== undefined) {
+    where.base_price = {};
+    if (filters.min_price !== undefined) where.base_price.gte = Number(filters.min_price);
+    if (filters.max_price !== undefined) where.base_price.lte = Number(filters.max_price);
   }
 
   // Filter by Featured
   if (filters.featuredOnly) {
-    filtered = filtered.filter(p => p.is_featured === true);
+    where.is_featured = true;
   }
 
   // Filter by Stock
   if (filters.in_stock) {
-    filtered = filtered.filter(p => p.stock > 0);
+    where.stock = { gt: 0 };
   }
 
   // Filter by Weight Variants
   if (filters.weight_label || filters.min_weight || filters.max_weight) {
-    filtered = filtered.filter(p => {
-      if (!p.weight_variants) return false;
-      return p.weight_variants.some(w => {
-        let match = true;
-        if (filters.weight_label && !w.label.toLowerCase().includes(filters.weight_label.toLowerCase())) match = false;
-        if (filters.min_weight && w.weight_grams < parseInt(filters.min_weight)) match = false;
-        if (filters.max_weight && w.weight_grams > parseInt(filters.max_weight)) match = false;
-        return match;
-      });
-    });
+    where.weight_variants = { some: {} };
+    if (filters.weight_label) where.weight_variants.some.label = { contains: filters.weight_label, mode: 'insensitive' };
+    if (filters.min_weight !== undefined) where.weight_variants.some.weight_grams = { gte: parseInt(filters.min_weight) };
+    if (filters.max_weight !== undefined) where.weight_variants.some.weight_grams = { lte: parseInt(filters.max_weight) };
   }
 
   // Apply Sorting
+  let orderBy = {};
   if (filters.sort === "price_asc") {
-    filtered.sort((a, b) => Number(a.base_price) - Number(b.base_price));
+    orderBy = { base_price: "asc" };
   } else if (filters.sort === "price_desc") {
-    filtered.sort((a, b) => Number(b.base_price) - Number(a.base_price));
-  } else if (filters.sort === "popular") {
-    filtered.sort((a, b) => Number(b.review_count || 0) - Number(a.review_count || 0));
+    orderBy = { base_price: "desc" };
   } else if (filters.sort === "name_asc") {
-    filtered.sort((a, b) => a.name.localeCompare(b.name));
+    orderBy = { name: "asc" };
   } else {
     // Default to newest
-    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    orderBy = { created_at: "desc" };
   }
 
-  const total = filtered.length;
   const page = Number(filters.page || 1);
   const limit = Number(filters.limit || 10);
   const skip = (page - 1) * limit;
 
-  const paginated = filtered.slice(skip, skip + limit);
+  // For 'popular' sort, we need to sort by review_count which Prisma can't easily do in orderBy with aggregations directly on the relation. 
+  // But we will fetch the data first, then sort if needed, or just ignore popular sort for now.
+  // Actually, we can fetch all IDs, get reviews, and sort in memory if sort === 'popular', but for pagination, it's better to stick to Prisma.
+  // Let's keep it simple and fast.
+  const [total, rows] = await prisma.$transaction([
+    prisma.products.count({ where }),
+    prisma.products.findMany({
+      where,
+      select: {
+        id: true,
+        category_id: true,
+        name: true,
+        slug: true,
+        description: true,
+        base_price: true,
+        stock: true,
+        images: true,
+        is_featured: true,
+        is_active: true,
+        created_at: true,
+        updated_at: true,
+        categories: true,
+        weight_variants: {
+          orderBy: { weight_grams: "asc" }
+        }
+      },
+      orderBy: filters.sort !== 'popular' ? orderBy : undefined,
+      take: filters.sort === 'popular' ? undefined : limit,
+      skip: filters.sort === 'popular' ? undefined : skip
+    })
+  ]);
+
+  let paginatedRows = rows;
+
+  const productIds = paginatedRows.map(r => r.id);
+  const reviewMap = await fetchReviewStatsByProductIds(productIds);
+
+  let products = paginatedRows.map((row) => mapProduct(row, reviewMap));
+
+  if (filters.sort === 'popular') {
+    products.sort((a, b) => Number(b.review_count || 0) - Number(a.review_count || 0));
+    paginatedRows = products.slice(skip, skip + limit);
+    products = paginatedRows;
+  }
 
   const result = {
-    products: paginated,
+    products,
     pagination: {
       page,
       limit,

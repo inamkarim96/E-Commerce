@@ -35,12 +35,18 @@ async function warmCache() {
     // 1. Warm DB connection with a raw query — confirms the wire is open
     await prisma.$queryRaw`SELECT 1`;
 
-    // 2. Pre-fetch admin user so the first login doesn't hit a cold DB lookup
+    // 2. Pre-fetch admin user and warm up Firebase SDK network connections
     if (ADMIN_EMAIL) {
       await prisma.users.findUnique({
         where: { email: ADMIN_EMAIL },
         select: { id: true, role: true, firebase_uid: true }
       }).catch(() => {});
+    }
+
+    const { auth: firebaseAuth } = require("./config/firebase");
+    if (firebaseAuth) {
+      // Forces Firebase Admin to fetch Google's IAM credentials/certificates in the background
+      await firebaseAuth.createCustomToken('warmup_uid').catch(() => {});
     }
 
     // 3. Warm application caches
