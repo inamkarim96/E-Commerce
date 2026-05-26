@@ -12,7 +12,6 @@ const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const ShopPage = lazy(() => import('./pages/ShopPage'));
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
-const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -73,7 +72,6 @@ function App() {
             <Route path="/contact" element={<MainLayout><PageWrapper><ContactPage /></PageWrapper></MainLayout>} />
             <Route path="/shop" element={<MainLayout><PageWrapper><ShopPage /></PageWrapper></MainLayout>} />
             <Route path="/product/:slug" element={<MainLayout><PageWrapper><ProductDetailPage /></PageWrapper></MainLayout>} />
-            <Route path="/cart" element={<MainLayout><PageWrapper><CartPage /></PageWrapper></MainLayout>} />
             <Route path="/login" element={<MainLayout><PageWrapper><LoginPage /></PageWrapper></MainLayout>} />
             <Route path="/payment/failed" element={<MainLayout><PageWrapper><PaymentFailedPage /></PageWrapper></MainLayout>} />
 
