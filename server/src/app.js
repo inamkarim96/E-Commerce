@@ -30,9 +30,14 @@ app.use(
   })
 );
 
+const allowedOrigins = [FRONTEND_URL, FRONTEND_URL.toLowerCase()];
+if (process.env.NODE_ENV === "development") {
+  allowedOrigins.push("http://localhost:5173", "http://localhost:5174", "http://localhost:5175");
+}
+
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: allowedOrigins,
     credentials: true
   })
 );
