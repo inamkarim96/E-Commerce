@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import { useCartStore } from '../store/useCartStore';
 import { Trash2, Plus, Minus, ArrowLeft, ShoppingBag, ArrowRight, ShieldCheck, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Card, Input, Badge } from '../components/ui';
@@ -8,7 +8,11 @@ import { Button, Card, Input, Badge } from '../components/ui';
 import { validateCoupon } from '../api/coupons';
 
 const CartPage = () => {
-  const { cart, updateQuantity, removeFromCart, subtotal } = useCart();
+  const cart = useCartStore((state) => state.cart);
+  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const removeFromCart = useCartStore((state) => state.removeFromCart);
+  const getSubtotal = useCartStore((state) => state.getSubtotal);
+  const subtotal = getSubtotal();
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [promoMsg, setPromoMsg] = useState(null);

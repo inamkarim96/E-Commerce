@@ -3,11 +3,13 @@ import { useLocation, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, Package, Truck, ArrowRight, Mail } from 'lucide-react';
 import { Button, Badge, Card } from '../components/ui';
-
+import Confetti from 'react-confetti';
+import { useWindowSize } from 'react-use';
 
 const OrderConfirmationPage = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { width, height } = useWindowSize();
 
   // Accepts order ID from: router state (COD/direct) OR query param (JazzCash redirect)
   const orderId = location.state?.orderId || searchParams.get('order_id');
@@ -18,8 +20,9 @@ const OrderConfirmationPage = () => {
   }
 
   return (
-    <div className="confirmation-page">
-      <div className="container">
+    <div className="confirmation-page relative">
+      <Confetti width={width} height={height} recycle={false} numberOfPieces={800} gravity={0.15} />
+      <div className="container relative z-10 py-12">
         <Card 
           as={motion.div}
           className="max-w-3xl mx-auto p-12 text-center overflow-visible"

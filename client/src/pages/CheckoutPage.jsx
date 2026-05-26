@@ -4,18 +4,22 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Badge, Input, Card } from '../components/ui';
 
-import { useCart } from '../context/CartContext';
+import { useCartStore } from '../store/useCartStore';
 import { useAuth } from '../context/AuthContext';
 import * as ordersApi from '../api/orders';
 import { getMyAddresses } from '../api/users';
 
 const CheckoutPage = () => {
   const [step, setStep] = useState(1);
-  const { cart, subtotal, clearCart } = useCart();
+  const cart = useCartStore((state) => state.cart);
+  const clearCart = useCartStore((state) => state.clearCart);
+  const getSubtotal = useCartStore((state) => state.getSubtotal);
+  const subtotal = getSubtotal();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
 
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -56,6 +60,25 @@ const CheckoutPage = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateStep1 = () => {
+    const errors = {};
+    if (!formData.email) errors.email = 'Email is required';
+    else if (!/\\S+@\\S+\\.\\S+/.test(formData.email)) errors.email = 'Email is invalid';
+    if (!formData.firstName) errors.firstName = 'First name is required';
+    if (!formData.lastName) errors.lastName = 'Last name is required';
+    if (!formData.address) errors.address = 'Address is required';
+    if (!formData.city) errors.city = 'City is required';
+    if (!formData.zipCode) errors.zipCode = 'ZIP Code is required';
+    
+    setFormErrors(errors);
+    if (Object.keys(errors).length === 0) {
+      setStep(2);
+    }
   };
 
   const handleApplyPromo = async () => {
@@ -235,6 +258,7 @@ const CheckoutPage = () => {
                         value={formData.email}
                         onChange={handleInputChange}
                         placeholder="you@example.com"
+                        error={formErrors.email}
                       />
                       <div className="grid grid-cols-2 gap-4">
                         <Input
@@ -243,6 +267,7 @@ const CheckoutPage = () => {
                           value={formData.firstName}
                           onChange={handleInputChange}
                           placeholder="Jane"
+                          error={formErrors.firstName}
                         />
                         <Input
                           label="Last Name"
@@ -250,6 +275,7 @@ const CheckoutPage = () => {
                           value={formData.lastName}
                           onChange={handleInputChange}
                           placeholder="Doe"
+                          error={formErrors.lastName}
                         />
                       </div>
                       <Input
@@ -258,6 +284,7 @@ const CheckoutPage = () => {
                         value={formData.address}
                         onChange={handleInputChange}
                         placeholder="123 Nature St"
+                        error={formErrors.address}
                       />
                       <div className="grid grid-cols-2 gap-4">
                         <Input
@@ -266,6 +293,7 @@ const CheckoutPage = () => {
                           value={formData.city}
                           onChange={handleInputChange}
                           placeholder="Karachi"
+                          error={formErrors.city}
                         />
                         <Input
                           label="ZIP / Postal Code"
@@ -273,11 +301,12 @@ const CheckoutPage = () => {
                           value={formData.zipCode}
                           onChange={handleInputChange}
                           placeholder="75500"
+                          error={formErrors.zipCode}
                         />
                       </div>
                     </div>
                     <div className="pt-8">
-                      <Button variant="primary" size="lg" className="w-full h-14 text-lg" onClick={() => setStep(2)} icon={ArrowRight}>
+                      <Button variant="primary" size="lg" className="w-full h-14 text-lg mt-6 shadow-premium hover:shadow-premium-hover active:scale-[0.98] transition-all" onClick={validateStep1} icon={ArrowRight}>
                         Continue to Payment
                       </Button>
                     </div>

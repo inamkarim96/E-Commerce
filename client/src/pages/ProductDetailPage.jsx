@@ -6,11 +6,13 @@ import { Button, Badge, Card } from '../components/ui';
 import ProductCard from '../components/ProductCard';
 
 import * as productsApi from '../api/products';
-import { useCart } from '../context/CartContext';
+import { useCartStore } from '../store/useCartStore';
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
-  const { addToCart, cart } = useCart();
+  const addToCart = useCartStore((state) => state.addToCart);
+  const cart = useCartStore((state) => state.cart);
+  const setIsCartOpen = useCartStore((state) => state.setIsCartOpen);
   const [quantity, setQuantity] = useState(1);
   const [selectedWeight, setSelectedWeight] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
@@ -184,7 +186,7 @@ const ProductDetailPage = () => {
               <Button
                 variant="primary"
                 className="add-to-cart-btn"
-                onClick={() => addToCart(product, quantity, selectedWeight)}
+                onClick={() => { addToCart(product, quantity, selectedWeight); setIsCartOpen(true); }}
                 disabled={(selectedWeight ? selectedWeight.stock : product.stock) <= 0}
               >
                 <ShoppingCart size={20} className="mr-2" />

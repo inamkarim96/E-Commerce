@@ -1,24 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, User, Menu, X, Leaf } from 'lucide-react';
+import { ShoppingCart, User, Menu, X, Leaf, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
-
+import { useCartStore } from '../store/useCartStore';
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 
 const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  
   const location = useLocation();
   const { user } = useAuth();
-  const { totalItems } = useCart();
+  const totalItems = useCartStore((state) => state.getTotalItems());
+  const setIsCartOpen = useCartStore((state) => state.setIsCartOpen);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const { scrollY } = useScroll();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    const previous = scrollY.getPrevious();
+    if (latest > 100 && latest > previous) {
+      setHidden(true);
+    } else {
+      setHidden(false);
+    }
+  });
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -28,57 +34,161 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className={`navbar ${isScrolled ? 'scrolled' : ''}`}>
-      <div className="nav-container">
-        <Link to="/" className="nav-logo">
-          <Leaf className="logo-icon" />
-          <span>KarakoramStore</span>
-        </Link>
+    <>
+      <motion.nav
+        variants={{
+          visible: { y: 0 },
+          hidden: { y: "-100%" },
+        }}
+        animate={hidden ? "hidden" : "visible"}
+        transition={{ duration: 0.35, ease: "easeInOut" }}
+        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-border shadow-sm"
+      >
+        <div className="container mx-auto px-4 h-16 md:h-20 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary">
+            <Leaf className="w-6 h-6 text-success" />
+            <span>KarakoramStore</span>
+          </Link>
 
-        {/* Desktop Links */}
-        <div className="nav-links desktop">
-          {navLinks.map((link) => (
-            <Link
-              key={link.name}
-              to={link.path}
-              className={`nav-link ${location.pathname === link.path ? 'active' : ''}`}
+          {/* Desktop Links */}
+          <div className="hidden md:flex items-center gap-8">
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                to={link.path}
+                className="relative text-text-main font-medium group py-2"
+              >
+                {link.name}
+                {location.pathname === link.path && (
+                  <motion.div
+                    layoutId="underline"
+                    className="absolute left-0 bottom-0 w-full h-[2px] bg-primary"
+                  />
+                )}
+                {location.pathname !== link.path && (
+                  <div className="absolute left-0 bottom-0 w-0 h-[2px] bg-primary transition-all duration-300 group-hover:w-full" />
+                )}
+              </Link>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-4">
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 text-text-main hover:bg-gray-100 rounded-full transition-colors"
             >
-              {link.name}
+              <Search className="w-5 h-5" />
+            </button>
+
+            <button 
+              onClick={() => setIsCartOpen(true)} 
+              className="relative p-2 text-text-main hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              <AnimatePresence>
+                {totalItems > 0 && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="absolute top-0 right-0 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+                  >
+                    {totalItems}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+
+            <Link 
+              to={user ? (user.role === 'admin' ? '/admin' : '/account') : '/login'} 
+              className="p-2 text-text-main hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <User className="w-5 h-5" />
             </Link>
-          ))}
+            
+            <button 
+              className="md:hidden p-2 text-text-main hover:bg-gray-100 rounded-full transition-colors" 
+              onClick={() => setIsMenuOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+      </motion.nav>
 
-        <div className="nav-actions">
-          <Link to="/cart" className="nav-icon-btn">
-            <ShoppingCart size={20} />
-            {totalItems > 0 && <span className="cart-count">{totalItems}</span>}
-          </Link>
-
-          <Link to={user ? (user.role === 'admin' ? '/admin' : '/account') : '/login'} className="nav-icon-btn">
-            <User size={20} />
-          </Link>
-          <button className="nav-icon-btn mobile-menu-btn" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Menu */}
-      <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`}>
-        {navLinks.map((link) => (
-          <Link
-            key={link.name}
-            to={link.path}
-            className="mobile-link"
-            onClick={() => setIsMenuOpen(false)}
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div 
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed inset-0 z-[100] bg-white flex flex-col p-6"
           >
-            {link.name}
-          </Link>
-        ))}
-      </div>
+            <div className="flex justify-between items-center mb-10">
+              <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary" onClick={() => setIsMenuOpen(false)}>
+                <Leaf className="w-6 h-6 text-success" />
+                <span>KarakoramStore</span>
+              </Link>
+              <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-gray-100 rounded-full">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex flex-col gap-6 text-2xl font-medium">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  className={`${location.pathname === link.path ? 'text-primary' : 'text-text-muted'}`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-
-    </nav>
+      {/* Search Overlay */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-4"
+          >
+            <button 
+              onClick={() => setIsSearchOpen(false)} 
+              className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="w-full max-w-2xl"
+            >
+              <h2 className="text-3xl font-bold mb-6 text-center">What are you looking for?</h2>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Search for products, categories..." 
+                  className="w-full border-b-2 border-gray-300 focus:border-primary bg-transparent py-4 pl-12 pr-4 text-xl outline-none transition-colors"
+                  autoFocus
+                />
+                <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 text-gray-400" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
