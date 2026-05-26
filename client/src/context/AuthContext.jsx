@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as authApi from '../api/auth';
+import { auth } from '../config/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const AuthContext = createContext();
 
@@ -9,31 +11,29 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for saved user on load and verify with backend
+  // Monitor Firebase auth state
   useEffect(() => {
-    const initAuth = async () => {
-      const savedUserStr = localStorage.getItem('naturadry_user');
-      if (!savedUserStr) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const savedUser = JSON.parse(savedUserStr);
-        const response = await authApi.getProfile();
-        if (response.success) {
-          const fullUser = { ...response.data, accessToken: savedUser.accessToken };
-          setUser(fullUser);
-          localStorage.setItem('naturadry_user', JSON.stringify(fullUser));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Fetch full user profile from PostgreSQL to get roles, addresses, etc
+          const response = await authApi.getProfile();
+          if (response.success) {
+            setUser({ ...firebaseUser, ...response.data });
+          } else {
+             setUser(firebaseUser);
+          }
+        } catch (error) {
+          // If profile fetch fails (e.g. backend down), we still keep firebase user
+          setUser(firebaseUser); 
         }
-      } catch (error) {
-        // Silently clear stale session
-        localStorage.removeItem('naturadry_user');
-      } finally {
-        setLoading(false);
+      } else {
+        setUser(null);
       }
-    };
-    initAuth();
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Idle Timeout (Auto Logout for Admins)
@@ -71,17 +71,16 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await authApi.loginUser(email, password);
-      if (response.success) {
-        if (response.data.status === 'VERIFICATION_REQUIRED') {
-          return response.data; // { status, email, customToken }
+      const response = await authApi.login(email, password);
+      if (response.success && response.data.customToken) {
+        const { signInWithCustomToken } = await import('firebase/auth');
+        const userCredential = await signInWithCustomToken(auth, response.data.customToken);
+        const idToken = await userCredential.user.getIdToken();
+        const syncResponse = await authApi.firebaseLogin(idToken);
+        if (syncResponse.success) {
+          setUser({ ...auth.currentUser, ...syncResponse.data.user });
+          return syncResponse.data.user;
         }
-        // response.data contains { accessToken, user }
-        const { user: userData, accessToken } = response.data;
-        const fullUser = { ...userData, accessToken };
-        setUser(fullUser);
-        localStorage.setItem('naturadry_user', JSON.stringify(fullUser));
-        return fullUser;
       }
     } catch (error) {
       throw error.response?.data?.error || error;
@@ -92,15 +91,12 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authApi.firebaseLogin(idToken, profileData);
       if (response.success) {
-        const { user: userData, accessToken } = response.data;
         // Firebase login now requires verification too — return status
         if (response.data.status === 'VERIFICATION_REQUIRED') {
           return response.data; // { status, email, customToken }
         }
-        const fullUser = { ...userData, accessToken };
-        setUser(fullUser);
-        localStorage.setItem('naturadry_user', JSON.stringify(fullUser));
-        return fullUser;
+        setUser({ ...auth.currentUser, ...response.data.user });
+        return response.data.user;
       }
     } catch (error) {
       throw error.response?.data?.error || error;
@@ -111,11 +107,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authApi.finalizeLogin(idToken);
       if (response.success) {
-        const { user: userData, accessToken } = response.data;
-        const fullUser = { ...userData, accessToken };
-        setUser(fullUser);
-        localStorage.setItem('naturadry_user', JSON.stringify(fullUser));
-        return fullUser;
+        setUser({ ...auth.currentUser, ...response.data.user });
+        return response.data.user;
       }
     } catch (error) {
       throw error.response?.data?.error || error;
@@ -124,12 +117,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await authApi.logoutUser();
+      await signOut(auth);
     } catch (error) {
       console.error("Logout error:", error);
-    } finally {
-      setUser(null);
-      localStorage.removeItem('naturadry_user');
     }
   };
 
@@ -137,11 +127,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authApi.updateProfile(data);
       if (response.success) {
-        setUser(prev => {
-          const updatedUser = { ...response.data, accessToken: prev.accessToken };
-          localStorage.setItem('naturadry_user', JSON.stringify(updatedUser));
-          return updatedUser;
-        });
+        setUser(prev => ({ ...prev, ...response.data }));
         return response;
       }
     } catch (error) {
@@ -155,3 +141,4 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+

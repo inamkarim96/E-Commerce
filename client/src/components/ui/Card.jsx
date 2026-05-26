@@ -1,23 +1,21 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
-const Card = ({ children, title, footer, className = '', ...props }) => {
-  return (
-    <div className={`admin-card overflow-hidden ${className}`} {...props}>
-      {title && (
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="font-bold text-slate-800">{title}</h3>
-        </div>
-      )}
-      <div className="p-4">
-        {children}
-      </div>
-      {footer && (
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          {footer}
-        </div>
-      )}
-    </div>
-  );
-};
+/**
+ * Glassmorphism Card
+ * @param {Object} props
+ * @param {React.ReactNode} props.children
+ * @param {string} [props.className]
+ */
+const Card = ({ children, className = '' }) => (
+  <motion.div
+    className={`backdrop-blur-lg bg-white/30 dark:bg-gray-800/60 border border-white/20 dark:border-gray-700/30 rounded-xl shadow-xl ${className}`}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4, ease: 'easeOut' }}
+  >
+    {children}
+  </motion.div>
+);
 
 export default Card;

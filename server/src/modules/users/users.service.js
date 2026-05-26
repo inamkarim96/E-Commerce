@@ -5,7 +5,7 @@ const ApiError = require("../../utils/apiError");
 const { auth: firebaseAuth } = require("../../config/firebase");
 
 async function getProfile(userId) {
-  return cache.getOrSet(`user:profile:${userId}`, 30, async () => {
+  return cache.getOrSet(`user:profile:${userId}`, 300, async () => {
     const user = await prisma.users.findUnique({
       where: { id: userId },
       select: {
@@ -112,7 +112,7 @@ async function changePassword(userId, currentPassword, newPassword) {
 }
 
 async function getAddresses(userId) {
-  return cache.getOrSet(`user:addresses:${userId}`, 30, () =>
+  return cache.getOrSet(`user:addresses:${userId}`, 300, () =>
     prisma.addresses.findMany({
       where: { user_id: userId },
       orderBy: [
@@ -124,7 +124,7 @@ async function getAddresses(userId) {
 }
 
 async function addAddress(userId, payload) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     if (payload.is_default) {
       await tx.addresses.updateMany({
         where: { user_id: userId },
@@ -148,7 +148,7 @@ async function addAddress(userId, payload) {
 }
 
 async function updateAddress(userId, addressId, payload) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const address = await tx.addresses.findFirst({
       where: { id: addressId, user_id: userId }
     });

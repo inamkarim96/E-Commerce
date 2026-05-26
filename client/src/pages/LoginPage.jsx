@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, ArrowRight } from 'lucide-react';
-import { Button, Input, Card, Badge } from '../components/ui';
-
+import Button from '../components/ui/Button.jsx';
+import Input from '../components/ui/Input.jsx';
+import Card from '../components/ui/Card.jsx';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -12,7 +13,9 @@ import {
   sendEmailVerification,
   updateProfile,
   RecaptchaVerifier,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import 'flag-icons/css/flag-icons.min.css';
@@ -144,7 +147,8 @@ const LoginPage = () => {
   const [otp, setOtp] = useState('');
   const [success, setSuccess] = useState(null);
 
-  const { user, firebaseLogin, login, finalizeLogin } = useAuth();
+  const { user, login: customLogin, firebaseLogin, finalizeLogin } = useAuth();
+
   const navigate = useNavigate();
   const recaptchaRef = useRef(null);
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
@@ -189,7 +193,7 @@ const LoginPage = () => {
           }
         }
       } catch (err) {
-        console.error("Polling error:", err);
+        console.error('Polling error:', err);
       }
     }, 3000);
   };
@@ -219,6 +223,21 @@ const LoginPage = () => {
     // Redirection is handled by useEffect
   };
 
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      await handleFirebaseSync(result.user);
+    } catch (err) {
+      setError(err.message || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -230,8 +249,7 @@ const LoginPage = () => {
         if (loginMethod === 'email') {
           const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase().trim();
           if (formData.email.toLowerCase().trim() === adminEmail) {
-            await login(formData.email, formData.password);
-            // Redirection is handled by useEffect
+            await customLogin(formData.email, formData.password);
           } else {
             const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
             await handleFirebaseSync(userCredential.user);
@@ -285,16 +303,14 @@ const LoginPage = () => {
         }
       }
     } catch (err) {
-      console.error(err);
+      // Provide a concise, user‑friendly error message
       let msg = 'Authentication failed';
 
-      // Handle Firebase specific error codes
       if (err.code === 'auth/user-not-found' || err.message?.includes('user-not-found')) {
-        msg = 'this user is not register';
+        msg = 'User not registered';
       } else if (err.code === 'auth/wrong-password' || err.message?.includes('wrong-password')) {
-        msg = 'password is incorrect';
+        msg = 'Incorrect password';
       } else if (err.code === 'auth/invalid-credential') {
-        // Modern Firebase returns this for both, but we can try to be helpful
         msg = 'Invalid email or password';
       } else if (typeof err === 'string') {
         msg = err;
@@ -350,7 +366,7 @@ const LoginPage = () => {
   };
 
   const selectedPhoneCountry = countries.find(c => c.code === formData.phoneCode);
-  const phonePlaceholder = React.useMemo(() => {
+  const phonePlaceholder = useMemo(() => {
     if (selectedPhoneCountry?.cca2) {
       try {
         const example = getExampleNumber(selectedPhoneCountry.cca2, examples);
@@ -368,11 +384,7 @@ const LoginPage = () => {
   return (
     <div className="login-page">
       <div className="login-container">
-        <motion.div
-          className="login-card"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <Card className="login-card">
           <div className="card-header">
             <h1>{(confirmationResult || isVerifyingEmail) ? 'Verify Your Identity' : isLogin ? 'Welcome Back' : 'Create Account'}</h1>
             <p>
@@ -387,6 +399,9 @@ const LoginPage = () => {
           </div>
 
           <div id="recaptcha-container"></div>
+          <Button onClick={handleGoogleLogin} variant="outline" className="w-full mb-4 flex items-center justify-center" loading={loading}>
+            Continue with Google
+          </Button>
 
           {error && (
             <div className="bg-red-50 border border-red-100 text-red-700 p-4 rounded-xl mb-6 text-sm font-medium">
@@ -475,7 +490,7 @@ const LoginPage = () => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    placeholder="Jhon"
+                    placeholder="first name"
                     required
                   />
                   <Input
@@ -483,7 +498,7 @@ const LoginPage = () => {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleChange}
-                    placeholder="Doe"
+                    placeholder="last name "
                     required
                   />
                 </div>
@@ -528,7 +543,7 @@ const LoginPage = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="jhon@gmail.com"
+                    placeholder="[EMAIL_ADDRESS]"
                     autoComplete="off"
                     required
                   />
@@ -614,7 +629,7 @@ const LoginPage = () => {
               </p>
             )}
           </div>
-        </motion.div>
+        </Card>
       </div>
 
 
