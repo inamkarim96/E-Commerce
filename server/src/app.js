@@ -30,7 +30,14 @@ app.use(
   })
 );
 
-const allowedOrigins = [FRONTEND_URL, FRONTEND_URL.toLowerCase()];
+// Remove any trailing slashes from FRONTEND_URL since Origin headers never have them
+const cleanFrontendUrl = FRONTEND_URL.replace(/\/$/, "");
+
+const allowedOrigins = [
+  cleanFrontendUrl, 
+  cleanFrontendUrl.toLowerCase()
+];
+
 if (process.env.NODE_ENV === "development") {
   allowedOrigins.push("http://localhost:5173", "http://localhost:5174", "http://localhost:5175");
 }
