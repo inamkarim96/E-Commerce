@@ -55,14 +55,14 @@ function mapProduct(row, reviewMap) {
 
 
 async function getAllProductsFromDB() {
-  const cacheKey = "products:all_active";
+  const cacheKey = "products:all";
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
-  // Single connection via interactive transaction — ONE BEGIN/COMMIT, no parallel cold starts
-  const products = await prisma.$transaction(async (tx) => {
-    const rows = await tx.products.findMany({
-      where: { is_active: true },
+  // Fetch products and stats concurrently without BEGIN/COMMIT overhead
+  const [rows, stats] = await Promise.all([
+
+    prisma.products.findMany({
       select: {
         id: true, category_id: true, name: true, slug: true,
         description: true, base_price: true, stock: true, images: true,
@@ -70,28 +70,23 @@ async function getAllProductsFromDB() {
         categories: { select: { id: true, name: true, slug: true } },
         weight_variants: { orderBy: { weight_grams: "asc" } }
       }
-    });
-
-    if (!rows.length) return [];
-
-    const productIds = rows.map(r => r.id);
-    const stats = await tx.reviews.groupBy({
+    }),
+    prisma.reviews.groupBy({
       by: ["product_id"],
-      where: { product_id: { in: productIds } },
       _avg: { rating: true },
       _count: { id: true }
-    });
+    })
+  ]);
 
-    const reviewMap = stats.reduce((acc, row) => {
-      acc[row.product_id] = {
-        avg_rating: row._avg.rating ? Number(row._avg.rating.toFixed(1)) : 0,
-        review_count: Number(row._count.id || 0)
-      };
-      return acc;
-    }, {});
+  const reviewMap = stats.reduce((acc, row) => {
+    acc[row.product_id] = {
+      avg_rating: row._avg.rating ? Number(row._avg.rating.toFixed(1)) : 0,
+      review_count: Number(row._count.id || 0)
+    };
+    return acc;
+  }, {});
 
-    return rows.map(row => mapProduct(row, reviewMap));
-  });
+  const products = rows.map(row => mapProduct(row, reviewMap));
 
   await cache.set(cacheKey, products, "EX", 3600);
   return products;
@@ -102,89 +97,69 @@ async function listProducts(filters) {
   const cachedData = await cache.get(cacheKey);
   if (cachedData) return cachedData;
 
-  const where = { is_active: true };
+  const allProducts = await getAllProductsFromDB();
+  
+  // In-memory filtering
+  let filtered = allProducts.filter(p => p.is_active === true);
+
   if (filters.q) {
-    where.OR = [
-      { name: { contains: filters.q, mode: 'insensitive' } },
-      { description: { contains: filters.q, mode: 'insensitive' } }
-    ];
+    const q = filters.q.toLowerCase();
+    filtered = filtered.filter(p => 
+      p.name?.toLowerCase().includes(q) || 
+      p.description?.toLowerCase().includes(q)
+    );
   }
-  if (filters.category) where.categories = { slug: filters.category };
-  if (filters.min_price !== undefined || filters.max_price !== undefined) {
-    where.base_price = {};
-    if (filters.min_price !== undefined) where.base_price.gte = Number(filters.min_price);
-    if (filters.max_price !== undefined) where.base_price.lte = Number(filters.max_price);
+  if (filters.category) {
+    filtered = filtered.filter(p => p.category?.slug === filters.category);
   }
-  if (filters.featuredOnly) where.is_featured = true;
-  if (filters.in_stock) where.stock = { gt: 0 };
-  if (filters.weight_label || filters.min_weight || filters.max_weight) {
-    where.weight_variants = { some: {} };
-    if (filters.weight_label) where.weight_variants.some.label = { contains: filters.weight_label, mode: 'insensitive' };
-    if (filters.min_weight !== undefined) where.weight_variants.some.weight_grams = { gte: parseInt(filters.min_weight) };
-    if (filters.max_weight !== undefined) where.weight_variants.some.weight_grams = { lte: parseInt(filters.max_weight) };
+  if (filters.min_price !== undefined) {
+    filtered = filtered.filter(p => Number(p.base_price) >= Number(filters.min_price));
+  }
+  if (filters.max_price !== undefined) {
+    filtered = filtered.filter(p => Number(p.base_price) <= Number(filters.max_price));
+  }
+  if (filters.featuredOnly) {
+    filtered = filtered.filter(p => p.is_featured === true);
+  }
+  if (filters.in_stock) {
+    filtered = filtered.filter(p => Number(p.stock) > 0);
+  }
+  if (filters.weight_label || filters.min_weight !== undefined || filters.max_weight !== undefined) {
+    filtered = filtered.filter(p => {
+      if (!p.weight_variants || p.weight_variants.length === 0) return false;
+      return p.weight_variants.some(v => {
+        let match = true;
+        if (filters.weight_label && !v.label?.toLowerCase().includes(filters.weight_label.toLowerCase())) match = false;
+        if (filters.min_weight !== undefined && v.weight_grams < Number(filters.min_weight)) match = false;
+        if (filters.max_weight !== undefined && v.weight_grams > Number(filters.max_weight)) match = false;
+        return match;
+      });
+    });
   }
 
-  let orderBy = { created_at: "desc" };
-  if (filters.sort === "price_asc") orderBy = { base_price: "asc" };
-  else if (filters.sort === "price_desc") orderBy = { base_price: "desc" };
-  else if (filters.sort === "name_asc") orderBy = { name: "asc" };
+  // In-memory sorting
+  if (filters.sort === "price_asc") {
+    filtered.sort((a, b) => Number(a.base_price) - Number(b.base_price));
+  } else if (filters.sort === "price_desc") {
+    filtered.sort((a, b) => Number(b.base_price) - Number(a.base_price));
+  } else if (filters.sort === "name_asc") {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (filters.sort === "popular") {
+    filtered.sort((a, b) => Number(b.review_count || 0) - Number(a.review_count || 0));
+  } else {
+    // Default: created_at desc (newest)
+    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
 
+  // In-memory pagination
   const page = Number(filters.page || 1);
   const limit = Number(filters.limit || 10);
+  const total = filtered.length;
   const skip = (page - 1) * limit;
-
-  const productSelect = {
-    id: true, category_id: true, name: true, slug: true,
-    description: true, base_price: true, stock: true, images: true,
-    is_featured: true, is_active: true, created_at: true, updated_at: true,
-    categories: { select: { id: true, name: true, slug: true } },
-    weight_variants: { orderBy: { weight_grams: "asc" } }
-  };
-
-  // Single connection via interactive transaction — ONE BEGIN/COMMIT, ONE cold start
-  const { total, rows, reviewMap } = await prisma.$transaction(async (tx) => {
-    const total = await tx.products.count({ where });
-    if (total === 0) return { total: 0, rows: [], reviewMap: {} };
-
-    const rows = await tx.products.findMany({
-      where,
-      select: productSelect,
-      orderBy: filters.sort !== 'popular' ? orderBy : undefined,
-      take: filters.sort === 'popular' ? undefined : limit,
-      skip: filters.sort === 'popular' ? undefined : skip
-    });
-
-    if (!rows.length) return { total, rows: [], reviewMap: {} };
-
-    // Scope review stats to only the returned products — avoids scanning the entire reviews table
-    const productIds = rows.map(r => r.id);
-    const stats = await tx.reviews.groupBy({
-      by: ["product_id"],
-      where: { product_id: { in: productIds } },
-      _avg: { rating: true },
-      _count: { id: true }
-    });
-
-    const reviewMap = stats.reduce((acc, row) => {
-      acc[row.product_id] = {
-        avg_rating: row._avg.rating ? Number(row._avg.rating.toFixed(1)) : 0,
-        review_count: Number(row._count.id || 0)
-      };
-      return acc;
-    }, {});
-
-    return { total, rows, reviewMap };
-  });
-
-  let products = rows.map(row => mapProduct(row, reviewMap));
-
-  if (filters.sort === 'popular') {
-    products.sort((a, b) => Number(b.review_count || 0) - Number(a.review_count || 0));
-    products = products.slice(skip, skip + limit);
-  }
+  const paginatedProducts = filtered.slice(skip, skip + limit);
 
   const result = {
-    products,
+    products: paginatedProducts,
     pagination: { page, limit, total, pages: total === 0 ? 0 : Math.ceil(total / limit) }
   };
 
@@ -193,58 +168,27 @@ async function listProducts(filters) {
 }
 
 async function listAdminProducts(filters) {
-  const page = Number(filters.page || 1);
-  const limit = Number(filters.limit || 10);
-  const skip = (page - 1) * limit;
-
   const cacheKey = `products:admin:list:${JSON.stringify(filters)}`;
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
-  // Single connection via interactive transaction — ONE BEGIN/COMMIT, ONE cold start
-  const { total, products } = await prisma.$transaction(async (tx) => {
-    const total = await tx.products.count();
-    if (total === 0) return { total: 0, products: [] };
+  const allProducts = await getAllProductsFromDB();
+  
+  // Admin list sees everything, so we only apply sorting and pagination
+  let filtered = [...allProducts];
 
-    const rows = await tx.products.findMany({
-      select: {
-        id: true, name: true, slug: true, description: true, base_price: true,
-        stock: true, images: true, is_featured: true, is_active: true,
-        created_at: true, updated_at: true, category_id: true,
-        categories: { select: { id: true, name: true, slug: true } },
-        weight_variants: {
-          select: { id: true, label: true, price: true, stock: true, weight_grams: true },
-          orderBy: { weight_grams: "asc" }
-        }
-      },
-      orderBy: { created_at: "desc" },
-      take: limit,
-      skip
-    });
+  // In-memory sorting (default newest)
+  filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    let reviewMap = {};
-    if (rows.length > 0) {
-      const productIds = rows.map(r => r.id);
-      const stats = await tx.reviews.groupBy({
-        by: ["product_id"],
-        where: { product_id: { in: productIds } },
-        _avg: { rating: true },
-        _count: { id: true }
-      });
-      reviewMap = stats.reduce((acc, row) => {
-        acc[row.product_id] = {
-          avg_rating: row._avg.rating ? Number(row._avg.rating.toFixed(1)) : 0,
-          review_count: Number(row._count.id || 0)
-        };
-        return acc;
-      }, {});
-    }
-
-    return { total, products: rows.map(row => mapProduct(row, reviewMap)) };
-  });
+  // In-memory pagination
+  const page = Number(filters.page || 1);
+  const limit = Number(filters.limit || 10);
+  const total = filtered.length;
+  const skip = (page - 1) * limit;
+  const paginatedProducts = filtered.slice(skip, skip + limit);
 
   const result = {
-    products,
+    products: paginatedProducts,
     pagination: { page, limit, total, pages: total === 0 ? 0 : Math.ceil(total / limit) }
   };
   await cache.set(cacheKey, result, "EX", 300);
@@ -266,56 +210,27 @@ async function searchProducts({ q, page, limit }) {
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
-  const where = {
-    is_active: true,
-    OR: [
-      { name: { contains: q, mode: 'insensitive' } },
-      { description: { contains: q, mode: 'insensitive' } }
-    ]
-  };
+  const allProducts = await getAllProductsFromDB();
+  
+  // In-memory search (active only)
+  let filtered = allProducts.filter(p => p.is_active === true);
+  
+  if (q) {
+    const qLower = q.toLowerCase();
+    filtered = filtered.filter(p => 
+      p.name?.toLowerCase().includes(qLower) || 
+      p.description?.toLowerCase().includes(qLower)
+    );
+  }
 
-  // Single connection via interactive transaction — ONE BEGIN/COMMIT, ONE cold start
-  const { total, products } = await prisma.$transaction(async (tx) => {
-    const total = await tx.products.count({ where });
-    if (total === 0) return { total: 0, products: [] };
+  // In-memory pagination (default newest)
+  filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    const rows = await tx.products.findMany({
-      where,
-      select: {
-        id: true, category_id: true, name: true, slug: true,
-        description: true, base_price: true, stock: true, images: true,
-        is_featured: true, is_active: true, created_at: true, updated_at: true,
-        categories: { select: { id: true, name: true, slug: true } },
-        weight_variants: { orderBy: { weight_grams: "asc" } }
-      },
-      orderBy: { created_at: "desc" },
-      take: limitNum,
-      skip
-    });
-
-    if (!rows.length) return { total, products: [] };
-
-    const ids = rows.map(r => r.id);
-    const stats = await tx.reviews.groupBy({
-      by: ["product_id"],
-      where: { product_id: { in: ids } },
-      _avg: { rating: true },
-      _count: { id: true }
-    });
-
-    const reviewMap = stats.reduce((acc, row) => {
-      acc[row.product_id] = {
-        avg_rating: row._avg.rating ? Number(row._avg.rating.toFixed(1)) : 0,
-        review_count: Number(row._count.id || 0)
-      };
-      return acc;
-    }, {});
-
-    return { total, products: rows.map(row => mapProduct(row, reviewMap)) };
-  });
+  const total = filtered.length;
+  const paginatedProducts = filtered.slice(skip, skip + limitNum);
 
   const result = {
-    products,
+    products: paginatedProducts,
     pagination: { page: pageNum, limit: limitNum, total, pages: total === 0 ? 0 : Math.ceil(total / limitNum) }
   };
 
@@ -414,7 +329,7 @@ async function createProduct(payload) {
       }
     });
 
-    await cache.del("products:all_active");
+    await cache.del("products:all");
     await cache.clearPattern("products:list");
     await cache.clearPattern("products:search");
     return _getProductByIdWithClient(tx, product.id, true);
@@ -533,7 +448,7 @@ async function deleteProduct(id) {
       where: { id }
     });
     await Promise.all([
-      cache.del("products:all_active"),
+      cache.del("products:all"),
       cache.clearPattern("products:list"),
       cache.clearPattern("products:admin:list"),
       cache.clearPattern("products:search"),
