@@ -25,9 +25,9 @@ const AdminOrders = () => {
     }
   }, [selectedOrder]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       const params = {};
       if (filters.status) params.status = filters.status;
       if (filters.date_from) params.date_from = filters.date_from;
@@ -40,12 +40,41 @@ const AdminOrders = () => {
     } catch (err) {
       toast.error('Failed to load orders');
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
+    }
+  };
+
+  const fetchOrderDetails = async (orderId) => {
+    try {
+      const res = await adminApi.getOrderDetails(orderId);
+      if (res.success) {
+        setSelectedOrder(res.data.order);
+      }
+    } catch (err) {
+      console.error('Failed to reload order details:', err);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(true);
+
+    const handleSocketUpdate = (event) => {
+      fetchOrders(false);
+      const { orderId } = event.detail || {};
+      if (orderId) {
+        setSelectedOrder(prev => {
+          if (prev && prev.id === orderId) {
+            fetchOrderDetails(orderId);
+          }
+          return prev;
+        });
+      }
+    };
+
+    window.addEventListener('socket:order_update', handleSocketUpdate);
+    return () => {
+      window.removeEventListener('socket:order_update', handleSocketUpdate);
+    };
   }, []);
 
   const handleStatusUpdate = async (orderId, newStatus) => {

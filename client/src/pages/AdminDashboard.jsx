@@ -20,27 +20,37 @@ const AdminDashboard = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchDashboardData = async (showLoader = true) => {
+    try {
+      if (showLoader) setLoading(true);
+      const [overviewRes, inventoryRes, ordersRes] = await Promise.all([
+        api.get('/admin/analytics/overview'),
+        api.get('/admin/analytics/inventory'),
+        api.get('/admin/orders?limit=5')
+      ]);
+      
+      if (overviewRes.data?.success) setOverview(overviewRes.data.data);
+      if (inventoryRes.data?.success) setInventory(inventoryRes.data.data || []);
+      if (ordersRes.data?.success) setRecentOrders(ordersRes.data.data.orders || []);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        const [overviewRes, inventoryRes, ordersRes] = await Promise.all([
-          api.get('/admin/analytics/overview'),
-          api.get('/admin/analytics/inventory'),
-          api.get('/admin/orders?limit=5')
-        ]);
-        
-        if (overviewRes.data?.success) setOverview(overviewRes.data.data);
-        if (inventoryRes.data?.success) setInventory(inventoryRes.data.data || []);
-        if (ordersRes.data?.success) setRecentOrders(ordersRes.data.data.orders || []);
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-        toast.error('Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
+    fetchDashboardData(true);
+
+    const handleSocketUpdate = () => {
+      fetchDashboardData(false);
     };
-    fetchDashboardData();
+
+    window.addEventListener('socket:order_update', handleSocketUpdate);
+    return () => {
+      window.removeEventListener('socket:order_update', handleSocketUpdate);
+    };
   }, []);
 
   const stats = [
