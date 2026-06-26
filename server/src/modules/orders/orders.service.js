@@ -4,6 +4,7 @@ const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
 const { SENDGRID_API_KEY, SENDGRID_FROM_EMAIL } = require("../../config/env");
 const { getIO } = require("../../utils/socket");
+const { notifyAdmins } = require("../../utils/adminNotifier");
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -341,6 +342,14 @@ async function createOrderFromCart(userId, payload) {
     html: `<p>Your KarakoramStore order has been placed.</p><p>Order ID: <strong>${result.orderId}</strong></p><p>Status: pending</p>`
   });
 
+  // ── Notify admins via SSE (works on Vercel serverless) ──────────────
+  notifyAdmins("NEW_ORDER", {
+    message: `New order #${result.orderId} placed by ${user?.email || userId}`,
+    orderId: result.orderId,
+    total: result.total
+  });
+
+  // ── Also try Socket.io for self-hosted / dev environments ─────────────
   try {
     getIO().to("admin").emit("NEW_ORDER", {
       message: `New order #${result.orderId} placed by ${user?.email || userId}`,
@@ -348,7 +357,7 @@ async function createOrderFromCart(userId, payload) {
       total: result.total
     });
   } catch (err) {
-    console.error("Failed to emit NEW_ORDER socket event", err);
+    // Socket.io not available (Vercel serverless) — SSE handles it above
   }
 
   return {
