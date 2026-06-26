@@ -6,7 +6,7 @@ import MainLayout from './layouts/MainLayout';
 import AdminLayout from './layouts/AdminLayout';
 import PageSkeleton from './components/PageSkeleton';
 import { motion, AnimatePresence } from 'framer-motion';
-import useSocket from './hooks/useSocket';
+
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
@@ -53,7 +53,6 @@ const PageWrapper = ({ children }) => (
 
 function App() {
   const location = useLocation();
-  useSocket();
   
   return (
     <>
