@@ -89,22 +89,54 @@ const AccountPage = () => {
 
   if (!user) return <Navigate to="/login" />;
 
-  //   Fetch orders  when tab is opened
+  const fetchOrders = async (showLoader = true) => {
+    try {
+      if (showLoader) setOrdersLoading(true);
+      const res = await getMyOrders();
+      if (res.success) setOrders(res.data.orders || []);
+    } catch (err) {
+      console.error('Failed to load orders:', err);
+    } finally {
+      if (showLoader) setOrdersLoading(false);
+    }
+  };
+
+  const fetchOrderDetails = async (orderId, showLoader = true) => {
+    try {
+      if (showLoader) setDetailsLoading(true);
+      const res = await getOrderById(orderId);
+      if (res.success) {
+        setSelectedOrderDetails(res.data.order);
+      }
+    } catch (err) {
+      console.error('Failed to load order details:', err);
+    } finally {
+      if (showLoader) setDetailsLoading(false);
+    }
+  };
+
+  // Fetch orders when tab is opened
   useEffect(() => {
     if (activeTab !== 'orders') return;
-    const fetchOrders = async () => {
-      try {
-        setOrdersLoading(true);
-        const res = await getMyOrders();
-        if (res.success) setOrders(res.data.orders || []);
-      } catch (err) {
-        console.error('Failed to load orders:', err);
-      } finally {
-        setOrdersLoading(false);
+    fetchOrders(true);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleSocketUpdate = (event) => {
+      if (activeTab === 'orders') {
+        fetchOrders(false);
+      }
+      const { orderId } = event.detail || {};
+      if (orderId && selectedOrderDetails && selectedOrderDetails.id === orderId) {
+        fetchOrderDetails(orderId, false);
       }
     };
-    fetchOrders();
-  }, [activeTab]);
+
+    window.addEventListener('socket:order_update', handleSocketUpdate);
+    return () => {
+      window.removeEventListener('socket:order_update', handleSocketUpdate);
+    };
+  }, [activeTab, selectedOrderDetails]);
 
   useEffect(() => {
     if (activeTab !== 'address') return;
@@ -137,17 +169,7 @@ const AccountPage = () => {
   };
 
   const handleViewOrder = async (orderId) => {
-    try {
-      setDetailsLoading(true);
-      const res = await getOrderById(orderId);
-      if (res.success) {
-        setSelectedOrderDetails(res.data.order);
-      }
-    } catch (err) {
-      console.error('Failed to load order details:', err);
-    } finally {
-      setDetailsLoading(false);
-    }
+    fetchOrderDetails(orderId, true);
   };
 
   const handleCancelOrder = async (orderId) => {

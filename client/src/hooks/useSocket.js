@@ -3,6 +3,8 @@ import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
+import { clearApiCache } from '../api/axios';
+
 const BASE_URL = import.meta.env.VITE_API_URL?.endsWith('/api')
   ? import.meta.env.VITE_API_URL.replace(/\/api$/, '')
   : (import.meta.env.VITE_API_URL || '');
@@ -36,7 +38,8 @@ export const useSocket = () => {
         duration: 5000,
         position: 'top-right',
       });
-      // Optionally trigger a refetch or update a store here
+      clearApiCache();
+      window.dispatchEvent(new CustomEvent('socket:order_update', { detail: data }));
     });
 
     socket.on('ORDER_STATUS_UPDATE', (data) => {
@@ -44,7 +47,8 @@ export const useSocket = () => {
         duration: 5000,
         position: 'top-right',
       });
-      // Optionally trigger a refetch or update a store here
+      clearApiCache();
+      window.dispatchEvent(new CustomEvent('socket:order_update', { detail: data }));
     });
 
     socket.on('disconnect', () => {
