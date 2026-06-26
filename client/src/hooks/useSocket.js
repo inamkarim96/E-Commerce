@@ -22,16 +22,29 @@ export const useSocket = () => {
 
     const socket = socketRef.current;
 
-    socket.on('connect', () => {
+    const handleConnect = () => {
       console.log('Socket connected:', socket.id);
-      
       if (user) {
-        socket.emit('join', {
-          userId: user.id || user.uid,
-          role: user.role
-        });
+        if (user.id) {
+          socket.emit('join', {
+            userId: user.id,
+            role: user.role
+          });
+        }
+        if (user.uid && user.uid !== user.id) {
+          socket.emit('join', {
+            userId: user.uid,
+            role: user.role
+          });
+        }
       }
-    });
+    };
+
+    socket.on('connect', handleConnect);
+
+    if (socket.connected) {
+      handleConnect();
+    }
 
     socket.on('NEW_ORDER', (data) => {
       toast.success(`📦 ${data.message}`, {

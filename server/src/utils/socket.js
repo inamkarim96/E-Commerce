@@ -30,7 +30,8 @@ const init = (server) => {
       if (data?.role === "admin") {
         socket.join("admin");
         console.log(`Socket ${socket.id} joined admin room`);
-      } else if (data?.userId) {
+      }
+      if (data?.userId) {
         socket.join(`user_${data.userId}`);
         console.log(`Socket ${socket.id} joined user_${data.userId}`);
       }
