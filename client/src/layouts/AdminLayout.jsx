@@ -1,6 +1,7 @@
 import React from 'react';
-import { NavLink, Link, Outlet } from 'react-router-dom';
+import { NavLink, Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useNotificationStore from '../store/useNotificationStore';
 import {
   LayoutDashboard as RxDashboard,
   Package,
@@ -19,6 +20,14 @@ import { Button } from '../components/ui';
 const AdminLayout = ({ children }) => {
   const { logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const location = useLocation();
+  const { newOrdersCount, clearNewOrders } = useNotificationStore();
+
+  React.useEffect(() => {
+    if (location.pathname === '/admin/orders') {
+      clearNewOrders();
+    }
+  }, [location.pathname, clearNewOrders]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -55,9 +64,9 @@ const AdminLayout = ({ children }) => {
             { to: '/admin', icon: RxDashboard, label: 'Dashboard', end: true },
             { to: '/admin/products', icon: FiPackage, label: 'Products' },
             { to: '/admin/categories', icon: FolderOpen, label: 'Categories' },
-            { to: '/admin/orders', icon: FiShoppingBag, label: 'Orders' },
+            { to: '/admin/orders', icon: FiShoppingBag, label: 'Orders', showBadge: true },
             { to: '/admin/users', icon: FiUsers, label: 'Users' }
-          ].map(({ to, icon: Icon, label, end }) => (
+          ].map(({ to, icon: Icon, label, end, showBadge }) => (
             <NavLink
               key={to}
               to={to}
@@ -65,8 +74,15 @@ const AdminLayout = ({ children }) => {
               onClick={() => setIsSidebarOpen(false)}
               className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
             >
-              <Icon size={20} />
-              {label}
+              <div className="flex items-center w-full">
+                <Icon size={20} className="mr-3" />
+                <span>{label}</span>
+                {showBadge && newOrdersCount > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {newOrdersCount}
+                  </span>
+                )}
+              </div>
             </NavLink>
           ))}
           <NavLink

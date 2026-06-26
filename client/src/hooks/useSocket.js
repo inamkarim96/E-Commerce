@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import useNotificationStore from '../store/useNotificationStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL?.endsWith('/api')
   ? import.meta.env.VITE_API_URL.replace(/\/api$/, '')
@@ -36,7 +37,7 @@ export const useSocket = () => {
         duration: 5000,
         position: 'top-right',
       });
-      // Optionally trigger a refetch or update a store here
+      useNotificationStore.getState().incrementNewOrders();
     });
 
     socket.on('ORDER_STATUS_UPDATE', (data) => {
