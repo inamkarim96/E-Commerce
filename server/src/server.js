@@ -82,7 +82,12 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, () => {
+  const http = require("http");
+  const server = http.createServer(app);
+  const socketUtil = require("./utils/socket");
+  socketUtil.init(server);
+
+  server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     // Start keep-alive pings to prevent Neon from sleeping
     startKeepAlive();

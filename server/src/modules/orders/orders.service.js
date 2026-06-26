@@ -3,6 +3,7 @@ const prisma = require("../../config/prisma");
 const cache = require("../../utils/cache");
 const ApiError = require("../../utils/apiError");
 const { SENDGRID_API_KEY, SENDGRID_FROM_EMAIL } = require("../../config/env");
+const { getIO } = require("../../utils/socket");
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -340,6 +341,16 @@ async function createOrderFromCart(userId, payload) {
     html: `<p>Your KarakoramStore order has been placed.</p><p>Order ID: <strong>${result.orderId}</strong></p><p>Status: pending</p>`
   });
 
+  try {
+    getIO().to("admin").emit("NEW_ORDER", {
+      message: `New order #${result.orderId} placed by ${user?.email || userId}`,
+      orderId: result.orderId,
+      total: result.total
+    });
+  } catch (err) {
+    console.error("Failed to emit NEW_ORDER socket event", err);
+  }
+
   return {
     order: {
       id: result.orderId,
@@ -515,6 +526,17 @@ async function updateOrderStatusByAdmin(orderId, payload, adminId) {
     cache.clearPattern(`orders:own:`),
     cache.clearPattern("orders:admin:")
   ]);
+
+  try {
+    const updatedOrder = await result;
+    getIO().to(`user_${updatedOrder.user_id}`).emit("ORDER_STATUS_UPDATE", {
+      message: `Your order #${orderId} status is now ${payload.status}`,
+      orderId,
+      status: payload.status
+    });
+  } catch (err) {
+    console.error("Failed to emit ORDER_STATUS_UPDATE socket event", err);
+  }
 
   return result;
 }
