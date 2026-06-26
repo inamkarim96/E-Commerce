@@ -1,6 +1,6 @@
-import api from './axios';
+import api, { clearApiCache } from './axios';
 
-// Simple client-side cache
+// Simple client-side cache for products API
 const apiCache = new Map();
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
@@ -14,8 +14,12 @@ const fetchWithCache = async (key, fetcher) => {
   return data;
 };
 
-// Function to clear cache when data is modified
-export const clearProductCache = () => apiCache.clear();
+// Flush both the products-specific cache AND the axios GET cache
+// so mutations always result in fresh data on next fetch
+export const clearProductCache = () => {
+  apiCache.clear();
+  clearApiCache();
+};
 
 export const getProducts = async (params) => {
   const key = `products:${JSON.stringify(params)}`;

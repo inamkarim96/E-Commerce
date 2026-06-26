@@ -73,18 +73,16 @@ async function auth(req, res, next) {
     let sessionUser = await cache.get(userCacheKey);
 
     if (!sessionUser) {
-      // DB lookup — try firebase_uid first, fall back to email
-      let user = await prisma.users.findUnique({
-        where: { firebase_uid: decodedToken.uid },
+      // DB lookup — combined firebase_uid and email into a single query
+      let user = await prisma.users.findFirst({
+        where: {
+          OR: [
+            { firebase_uid: decodedToken.uid },
+            ...(decodedToken.email ? [{ email: decodedToken.email }] : [])
+          ]
+        },
         select: { id: true, email: true, role: true }
       });
-
-      if (!user && decodedToken.email) {
-        user = await prisma.users.findUnique({
-          where: { email: decodedToken.email },
-          select: { id: true, email: true, role: true }
-        });
-      }
 
       if (!user) {
         return next(new ApiError(401, "User not found in database", "USER_NOT_FOUND"));

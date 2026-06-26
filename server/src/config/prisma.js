@@ -9,7 +9,8 @@ const globalForPrisma = globalThis;
 const prisma =
   globalForPrisma.__prisma ||
   new PrismaClient({
-    log: isDev ? ["warn", "error"] : ["warn", "error"],
+    // dev: log slow/warn queries for debugging; prod: errors only (no query noise)
+    log: isDev ? ["query", "warn", "error"] : ["error"],
   });
 
 if (isDev) {

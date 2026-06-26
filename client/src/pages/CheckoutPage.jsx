@@ -68,7 +68,7 @@ const CheckoutPage = () => {
   const validateStep1 = () => {
     const errors = {};
     if (!formData.email) errors.email = 'Email is required';
-    else if (!/\\S+@\\S+\\.\\S+/.test(formData.email)) errors.email = 'Email is invalid';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Email is invalid';
     if (!formData.firstName) errors.firstName = 'First name is required';
     if (!formData.lastName) errors.lastName = 'Last name is required';
     if (!formData.address) errors.address = 'Address is required';
@@ -168,6 +168,10 @@ const CheckoutPage = () => {
         
         window.location.href = paymentUrl;
         return; // Redirecting to Stripe hosted checkout
+      }
+
+      if (gateway === 'cod') {
+        await ordersApi.initiatePayment(orderId, 'cod');
       }
 
       // COD → go to confirmation page

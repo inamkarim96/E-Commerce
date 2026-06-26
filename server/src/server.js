@@ -8,9 +8,9 @@ const analyticsService = require("./modules/admin/analytics.service");
 const ordersService = require("./modules/orders/orders.service");
 
 // ─── Keep-alive ping: prevents Neon serverless from sleeping ───
-// Neon suspends idle connections after ~5 minutes. This pings every 4 minutes
+// Neon suspends idle connections after ~5 minutes. Ping every 3 minutes
 // so the connection stays warm and the next real query doesn't hit a cold start.
-const KEEP_ALIVE_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
+const KEEP_ALIVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 let keepAliveTimer = null;
 
 function startKeepAlive() {
@@ -40,22 +40,19 @@ async function warmCache() {
       await prisma.users.findUnique({
         where: { email: ADMIN_EMAIL },
         select: { id: true, role: true, firebase_uid: true }
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     const { auth: firebaseAuth } = require("./config/firebase");
     if (firebaseAuth) {
       // Forces Firebase Admin to fetch Google's IAM credentials/certificates in the background
-      await firebaseAuth.createCustomToken('warmup_uid').catch(() => {});
+      await firebaseAuth.createCustomToken('warmup_uid').catch(() => { });
     }
 
     // 3. Warm application caches
     await Promise.all([
       categoriesService.listCategories(),
-      productsService.getAllProductsFromDB(),
-      analyticsService.getOverview(),
-      analyticsService.getInventoryAnalytics(),
-      ordersService.listAdminOrders({ page: 1, limit: 5 })
+      productsService.getAllProductsFromDB()
     ]);
 
     console.log("Cache warmed successfully.");

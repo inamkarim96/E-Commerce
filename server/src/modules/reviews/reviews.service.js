@@ -54,30 +54,25 @@ async function getProductReviews(productId, { page = 1, limit = 10 }) {
 }
 
 async function createReview(userId, { product_id, rating, title, body }) {
-  // Purchase verification
-  const purchase = await prisma.orders.findFirst({
-    where: {
-      user_id: userId,
-      status: "delivered",
-      order_items: {
-        some: { product_id }
-      }
-    }
-  });
+  // Run purchase verification and duplicate check concurrently — 2 serial queries → 1 parallel batch
+  const [purchase, existing] = await Promise.all([
+    prisma.orders.findFirst({
+      where: {
+        user_id: userId,
+        status: "delivered",
+        order_items: { some: { product_id } }
+      },
+      select: { id: true }
+    }),
+    prisma.reviews.findUnique({
+      where: { user_id_product_id: { user_id: userId, product_id } },
+      select: { id: true }
+    })
+  ]);
 
   if (!purchase) {
     throw new ApiError(403, "You can only review products you have purchased and received.", "PURCHASE_REQUIRED");
   }
-
-  // Duplicate check
-  const existing = await prisma.reviews.findUnique({
-    where: {
-      user_id_product_id: {
-        user_id: userId,
-        product_id
-      }
-    }
-  });
 
   if (existing) {
     throw new ApiError(409, "You have already reviewed this product.", "DUPLICATE_REVIEW");
@@ -94,7 +89,7 @@ async function createReview(userId, { product_id, rating, title, body }) {
     }
   });
 
-  // Recalculate and cache
+  // Recalculate rating cache and invalidate review list cache in parallel
   await Promise.all([
     updateProductRatingCache(product_id),
     cache.clearPattern(`reviews:${product_id}:`)

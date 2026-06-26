@@ -38,11 +38,12 @@ api.interceptors.request.use(
 
     // 2. Cache Check (Only GET, exclude Auth)
     if (config.method?.toLowerCase() === 'get' && !config.url?.includes('/auth')) {
-      const cacheKey = `${config.url}?${new URLSearchParams(config.params || {}).toString()}`;
+      // Include auth state in the key — prevents logged-out responses leaking to logged-in users
+      const authIndicator = auth.currentUser ? 'authed' : 'anon';
+      const cacheKey = `${config.url}?${new URLSearchParams(config.params || {}).toString()}&_a=${authIndicator}`;
       const cached = getCache.get(cacheKey);
-      
+
       if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        // Create an Axios adapter to instantly resolve with the cached data
         config.adapter = () => {
           return Promise.resolve({
             data: cached.data,
@@ -64,9 +65,10 @@ api.interceptors.request.use(
 // Interceptor 2: Response Handling & Cache Save
 api.interceptors.response.use(
   (response) => {
-    // Save successful GET requests to cache
+    // Save successful GET requests to cache (keyed with auth state)
     if (response.config.method?.toLowerCase() === 'get' && !response.config.url?.includes('/auth')) {
-      const cacheKey = `${response.config.url}?${new URLSearchParams(response.config.params || {}).toString()}`;
+      const authIndicator = auth.currentUser ? 'authed' : 'anon';
+      const cacheKey = `${response.config.url}?${new URLSearchParams(response.config.params || {}).toString()}&_a=${authIndicator}`;
       getCache.set(cacheKey, {
         timestamp: Date.now(),
         data: response.data,

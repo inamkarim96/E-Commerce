@@ -99,15 +99,23 @@ async function listOwnOrders(userId, { page, limit }) {
   const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
-  const [total, rows] = await prisma.$transaction([
+  // Promise.all is sufficient for read-only queries — $transaction wastes a connection slot
+  const [total, rows] = await Promise.all([
     prisma.orders.count({ where: { user_id: userId } }),
     prisma.orders.findMany({
       where: { user_id: userId },
-      include: {
-        _count: {
-          select: { order_items: true }
-        },
-        payments: true
+      select: {
+        id: true,
+        status: true,
+        total: true,
+        subtotal: true,
+        shipping_fee: true,
+        discount: true,
+        coupon_code: true,
+        created_at: true,
+        updated_at: true,
+        payments: { select: { status: true, gateway: true } },
+        _count: { select: { order_items: true } }
       },
       orderBy: { created_at: "desc" },
       take: limitNum,
@@ -140,12 +148,12 @@ async function getOwnOrder(userId, orderId) {
   return order;
 }
 
-async function validateCoupon(couponCode, subtotal) {
+async function validateCoupon(couponCode, subtotal, client = prisma) {
   if (!couponCode) {
     return { discount: 0, coupon: null };
   }
 
-  const coupon = await prisma.coupons.findUnique({
+  const coupon = await client.coupons.findUnique({
     where: { code: couponCode }
   });
   if (!coupon) {
@@ -205,7 +213,7 @@ async function createOrderFromCart(userId, payload) {
 
     // FALLBACK
     if (!cartItems.length && payload.items && payload.items.length) {
-      for (const item of payload.items) {
+      const resolvedItems = await Promise.all(payload.items.map(async (item) => {
         let variantId = item.variant_id || (typeof item.weight === 'object' ? item.weight.id : null);
         
         if (!variantId && typeof item.weight === 'object' && item.weight.label) {
@@ -226,7 +234,7 @@ async function createOrderFromCart(userId, payload) {
           throw new ApiError(404, `Product/Variant not found: ${variantId}`, "NOT_FOUND");
         }
 
-        cartItems.push({
+        return {
           product_id: details.product_id,
           variant_id: details.id,
           quantity: item.quantity,
@@ -234,8 +242,9 @@ async function createOrderFromCart(userId, payload) {
           variant_label: details.label,
           variant_price: details.price,
           variant_stock: details.stock
-        });
-      }
+        };
+      }));
+      cartItems.push(...resolvedItems);
     }
 
     if (!cartItems.length) {
@@ -249,7 +258,7 @@ async function createOrderFromCart(userId, payload) {
     }
 
     const subtotal = cartItems.reduce((sum, item) => sum + toNumber(item.quantity) * toNumber(item.variant_price), 0);
-    const { discount, coupon } = await validateCoupon(payload.coupon_code, subtotal);
+    const { discount, coupon } = await validateCoupon(payload.coupon_code, subtotal, tx);
     const shippingFee = subtotal >= 2000 ? 0 : 150;
     const total = subtotal + shippingFee - discount;
 
@@ -286,16 +295,16 @@ async function createOrderFromCart(userId, payload) {
     });
 
     // Update stocks
-    for (const item of cartItems) {
-      await tx.weight_variants.update({
+    await Promise.all(cartItems.flatMap(item => [
+      tx.weight_variants.update({
         where: { id: item.variant_id },
         data: { stock: { decrement: item.quantity } }
-      });
-      await tx.products.update({
+      }),
+      tx.products.update({
         where: { id: item.product_id },
         data: { stock: { decrement: item.quantity } }
-      });
-    }
+      })
+    ]));
 
     if (coupon) {
       await tx.coupons.update({
@@ -321,17 +330,23 @@ async function createOrderFromCart(userId, payload) {
   // Invalidate caches after successful order creation
   await invalidateOrderCaches(userId);
 
-  const order = await fetchOrderById(result.orderId);
+  // Lightweight user lookup for email instead of heavy fetchOrderById
+  const user = await prisma.users.findUnique({ where: { id: userId }, select: { email: true } });
 
   sendOrderEmailAsync({
-    to: order.user_email,
-    subject: `Order confirmation - ${order.id}`,
-    text: `Your KarakoramStore order has been placed. Status: ${order.status}`,
-    html: `<p>Your KarakoramStore order has been placed.</p><p>Order ID: <strong>${order.id}</strong></p><p>Status: ${order.status}</p>`
+    to: user?.email,
+    subject: `Order confirmation - ${result.orderId}`,
+    text: `Your KarakoramStore order has been placed. Status: pending`,
+    html: `<p>Your KarakoramStore order has been placed.</p><p>Order ID: <strong>${result.orderId}</strong></p><p>Status: pending</p>`
   });
 
   return {
-    order,
+    order: {
+      id: result.orderId,
+      status: "pending",
+      total: result.total,
+      user_email: user?.email
+    },
     payment_url: result.paymentUrl
   };
 }
@@ -340,7 +355,8 @@ async function cancelOwnOrder(userId, orderId) {
   try {
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.orders.findUnique({
-        where: { id: orderId }
+        where: { id: orderId },
+        include: { order_items: { select: { product_id: true, variant_id: true, quantity: true } } }
       });
       if (!order || order.user_id !== userId) {
         throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
@@ -349,31 +365,27 @@ async function cancelOwnOrder(userId, orderId) {
         throw new ApiError(400, "Only pending orders can be cancelled", "INVALID_ORDER_STATE");
       }
 
-      await tx.orders.update({
-        where: { id: orderId },
-        data: { status: "cancelled", updated_at: new Date() }
-      });
-
-      const items = await tx.order_items.findMany({ where: { order_id: orderId } });
-      for (const item of items) {
-        if (item.variant_id) {
-          await tx.weight_variants.update({
+      // All writes fire concurrently inside the transaction
+      await Promise.all([
+        tx.orders.update({
+          where: { id: orderId },
+          data: { status: "cancelled", updated_at: new Date() }
+        }),
+        // Restore stock for all items in parallel (flatMap → [variantUpdate, productUpdate, ...])
+        ...order.order_items.flatMap(item => [
+          ...(item.variant_id ? [tx.weight_variants.update({
             where: { id: item.variant_id },
             data: { stock: { increment: item.quantity } }
-          });
-        }
-        await tx.products.update({
-          where: { id: item.product_id },
-          data: { stock: { increment: item.quantity } }
-        });
-      }
+          })] : []),
+          tx.products.update({
+            where: { id: item.product_id },
+            data: { stock: { increment: item.quantity } }
+          })
+        ])
+      ]);
 
-      const updated = await fetchOrderById(orderId, tx);
-      return updated;
-    }, {
-      maxWait: 5000,
-      timeout: 20000
-    });
+      return fetchOrderById(orderId, tx);
+    }, { maxWait: 5000, timeout: 20000 });
 
     await invalidateOrderCaches(userId);
     return result;
@@ -400,7 +412,7 @@ async function listAdminOrders(filters) {
     if (filters.date_from) where.created_at.gte = new Date(filters.date_from);
     if (filters.date_to) where.created_at.lte = new Date(filters.date_to);
   }
-  
+
   if (filters.search) {
     where.OR = [
       { users: { name: { contains: filters.search, mode: 'insensitive' } } },
@@ -408,11 +420,18 @@ async function listAdminOrders(filters) {
     ];
   }
 
-  const [total, rows] = await prisma.$transaction([
+  // Read-only: Promise.all is faster than $transaction (no connection slot wasted)
+  const [total, rows] = await Promise.all([
     prisma.orders.count({ where }),
     prisma.orders.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        status: true,
+        total: true,
+        subtotal: true,
+        created_at: true,
+        updated_at: true,
         users: { select: { name: true, email: true } },
         _count: { select: { order_items: true } }
       },
@@ -469,17 +488,23 @@ async function updateOrderStatusByAdmin(orderId, payload, adminId) {
     });
 
     if (payload.status === "cancelled" && order.status !== "cancelled") {
-      const items = await tx.order_items.findMany({ where: { order_id: orderId } });
-      for (const item of items) {
-        await tx.weight_variants.update({
-          where: { id: item.variant_id },
-          data: { stock: { increment: item.quantity } }
-        });
-        await tx.products.update({
-          where: { id: item.product_id },
-          data: { stock: { increment: item.quantity } }
-        });
-      }
+      const items = await tx.order_items.findMany({
+        where: { order_id: orderId },
+        select: { product_id: true, variant_id: true, quantity: true }
+      });
+      // Restore stock for all items concurrently — O(1) round-trips instead of O(n)
+      await Promise.all(
+        items.flatMap(item => [
+          ...(item.variant_id ? [tx.weight_variants.update({
+            where: { id: item.variant_id },
+            data: { stock: { increment: item.quantity } }
+          })] : []),
+          tx.products.update({
+            where: { id: item.product_id },
+            data: { stock: { increment: item.quantity } }
+          })
+        ])
+      );
     }
 
     return fetchOrderById(orderId, tx);
@@ -499,16 +524,25 @@ async function getAdminOrder(orderId) {
 }
 
 async function updateOrderAdminNotes(orderId, notes) {
-  await prisma.orders.update({
+  // Return only the updated order with minimal select — avoids the heavy fetchOrderById join
+  const updated = await prisma.orders.update({
     where: { id: orderId },
-    data: { admin_notes: notes, updated_at: new Date() }
+    data: { admin_notes: notes, updated_at: new Date() },
+    select: {
+      id: true,
+      admin_notes: true,
+      status: true,
+      updated_at: true
+    }
   });
-  return fetchOrderById(orderId);
+  if (!updated) throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
+  return updated;
 }
 
 async function deleteOwnOrder(userId, orderId) {
   const order = await prisma.orders.findUnique({
-    where: { id: orderId }
+    where: { id: orderId },
+    select: { user_id: true, status: true }
   });
 
   if (!order || order.user_id !== userId) {
@@ -519,21 +553,13 @@ async function deleteOwnOrder(userId, orderId) {
     throw new ApiError(400, "Only cancelled or delivered orders can be deleted from history", "INVALID_ORDER_STATE");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    // Delete payments first because of foreign key constraint
-    await tx.payments.deleteMany({
-      where: { order_id: orderId }
-    });
-
-    await tx.orders.delete({
-      where: { id: orderId }
-    });
-
-    return { success: true };
-  });
+  // Payments have onDelete: NoAction, so delete them first, then the order.
+  // No need for a transaction wrapper here — if payments delete but order fails, a retry is safe.
+  await prisma.payments.deleteMany({ where: { order_id: orderId } });
+  await prisma.orders.delete({ where: { id: orderId } });
 
   await invalidateOrderCaches(userId);
-  return result;
+  return { success: true };
 }
 
 module.exports = {

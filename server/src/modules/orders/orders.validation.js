@@ -6,13 +6,13 @@ const Joi = require("joi");
 // - quantity is capped at 100 per item to prevent abuse
 const orderItemSchema = Joi.object({
   product_id: Joi.string().uuid().required(),
-  variant_id: Joi.string().uuid().optional(),
+  variant_id: Joi.string().uuid().allow("", null).optional(),
   quantity: Joi.number().integer().min(1).max(100).required(),
   // weight is accepted as an object {id, label} from the frontend for UX,
   // but the actual price is always fetched from the DB — never trusted from client.
   weight: Joi.object({
-    id: Joi.string().uuid().optional(),
-    label: Joi.string().max(50).optional()
+    id: Joi.string().uuid().allow("", null).optional(),
+    label: Joi.string().max(50).allow("", null).optional()
   }).optional()
   // price is intentionally omitted — will be stripped by stripUnknown
 });

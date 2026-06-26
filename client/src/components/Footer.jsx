@@ -56,24 +56,12 @@ const Footer = () => {
             </div>
             <div className="contact-item">
               <Phone size={18} />
-              <span>+92 3154125780</span>
+              <span>+92 327-5117908</span>
             </div>
             <div className="contact-item">
               <Mail size={18} />
               <span>inamkarim96@gmail.com</span>
             </div>
-          </div>
-
-          {/* Map/Origin Section */}
-          <div className="footer-map-section">
-            <h3>Our Origin</h3>
-            <div className="footer-map-container">
-              <img src={gbMap} alt="Gilgit Baltistan Map" className="footer-map-img" />
-              <div className="footer-map-overlay">
-                <span className="footer-map-tag">Gilgit-Baltistan</span>
-              </div>
-            </div>
-            <p className="footer-map-text"> Products brought directly from Gilgit-Baltistan</p>
           </div>
         </div>
 

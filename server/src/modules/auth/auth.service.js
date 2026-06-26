@@ -108,21 +108,16 @@ async function firebaseLogin(idToken, profileData = null) {
 
   const { uid, email, name, phone_number } = decodedToken;
 
-  // Parallel lookup: try both firebase_uid and email at the same time
-  const [userByUid, userByEmail] = await Promise.all([
-    prisma.users.findUnique({
-      where: { firebase_uid: uid },
-      select: USER_SELECT
-    }),
-    email
-      ? prisma.users.findUnique({
-          where: { email },
-          select: USER_SELECT
-        })
-      : Promise.resolve(null)
-  ]);
-
-  let user = userByUid || userByEmail;
+  // Single lookup with OR clause to save network round-trips
+  let user = await prisma.users.findFirst({
+    where: {
+      OR: [
+        { firebase_uid: uid },
+        ...(email ? [{ email }] : [])
+      ]
+    },
+    select: USER_SELECT
+  });
 
   // Admin Security Logic
   const isAuthorizedAdmin =
@@ -139,9 +134,9 @@ async function firebaseLogin(idToken, profileData = null) {
     const finalName = profileData?.name || name || email?.split('@')[0] || 'User';
     const finalPhone = profileData?.phone || phone_number || null;
 
-    // Use 6 rounds instead of 12 for throwaway passwords (Firebase handles real auth).
-    // This alone saves ~200ms per registration.
-    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 6);
+    // Use fast SHA256 instead of bcrypt for throwaway passwords (Firebase handles real auth).
+    // This saves ~100ms CPU cycles on registration.
+    const passwordHash = crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex');
 
     user = await prisma.users.create({
       data: {
@@ -238,21 +233,16 @@ async function finalizeLoginAfterVerification(idToken) {
     throw new ApiError(401, "Email is not verified yet", "EMAIL_NOT_VERIFIED");
   }
 
-  // Parallel lookup: try both firebase_uid and email at the same time
-  const [userByUid, userByEmail] = await Promise.all([
-    prisma.users.findUnique({
-      where: { firebase_uid: decodedToken.uid },
-      select: USER_SELECT
-    }),
-    decodedToken.email
-      ? prisma.users.findUnique({
-          where: { email: decodedToken.email },
-          select: USER_SELECT
-        })
-      : Promise.resolve(null)
-  ]);
-
-  let user = userByUid || userByEmail;
+  // Single lookup with OR clause to save network round-trips
+  let user = await prisma.users.findFirst({
+    where: {
+      OR: [
+        { firebase_uid: decodedToken.uid },
+        ...(decodedToken.email ? [{ email: decodedToken.email }] : [])
+      ]
+    },
+    select: USER_SELECT
+  });
 
   if (!user) {
     throw new ApiError(404, "User not found", "USER_NOT_FOUND");

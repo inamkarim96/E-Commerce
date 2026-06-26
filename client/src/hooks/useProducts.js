@@ -14,8 +14,9 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(initialFilters);
 
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
+  // Track whether the initial mount fetch has already fired
+  // to prevent a second fetch when the filters effect runs on mount
+  const isMountedFetch = useRef(false);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -33,7 +34,7 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
   }, []);
 
   const fetchProducts = useCallback(async (currentFilters) => {
-    const resolvedFilters = currentFilters ?? filtersRef.current;
+    const resolvedFilters = currentFilters ?? filters;
     try {
       setLoading(true);
       setError(null);
@@ -52,16 +53,27 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Mount effect: fetch categories and initial products in parallel — single fetch only
   useEffect(() => {
-    fetchCategories();
-    fetchProducts(initialFilters);
+    isMountedFetch.current = true;
+    Promise.all([
+      fetchCategories(),
+      fetchProducts(initialFilters)
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Filters effect: skip on mount (isMountedFetch.current === true means mount just ran)
+  // Only fires when filters change after the initial mount
   useEffect(() => {
+    if (isMountedFetch.current) {
+      isMountedFetch.current = false;
+      return; // skip — mount effect already fetched with initialFilters
+    }
     fetchProducts(filters);
-  }, [filters]);
+  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     products,
@@ -78,4 +90,3 @@ export const useProducts = ({ isAdmin = false, initialFilters = {} } = {}) => {
 };
 
 export default useProducts;
-
