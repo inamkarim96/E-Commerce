@@ -1,7 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "Backend API for NaturaDry e-commerce platform",
+  "description": "Backend API for KarakoramStore e-commerce platform",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

@@ -46,14 +46,14 @@ const ContactPage = () => {
       {/* Hero Section */}
       <section className="relative h-[45vh] min-h-[350px] flex items-center justify-center text-center text-white mb-[-4rem]">
         <div className="absolute inset-0 z-0">
-          <img 
-            src="/images/contact_hero.png" 
-            alt="Contact Hero" 
+          <img
+            src="/images/contact_hero.png"
+            alt="Contact Hero"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-primary/80 to-primary-dark/90"></div>
         </div>
-        
+
         <div className="relative z-10 max-w-3xl px-6">
           <motion.h1
             className="text-5xl md:text-6xl font-black mb-6 tracking-tight drop-shadow-lg"
@@ -117,7 +117,7 @@ const ContactPage = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold mb-1">Email Us</h3>
-                  <p className="text-emerald-100/60 leading-relaxed">support@naturadry.com<br />hello@naturadry.com</p>
+                  <p className="text-emerald-100/60 leading-relaxed">support@KarakoramStore.com<br />hello@KarakoramStore.com</p>
                 </div>
               </motion.div>
             </div>

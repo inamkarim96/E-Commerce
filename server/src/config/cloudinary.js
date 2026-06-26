@@ -17,7 +17,7 @@ function uploadProductImage(buffer, filename) {
   const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
   return cloudinary.uploader
     .upload(dataUri, {
-      folder: "naturadry/products",
+      folder: "KarakoramStore/products",
       resource_type: "image",
       public_id: filename
     })

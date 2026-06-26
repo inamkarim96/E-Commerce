@@ -1,15 +1,15 @@
 import React from 'react';
 import { NavLink, Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard as RxDashboard, 
-  Package, 
-  Package as FiPackage, 
-  ShoppingBag as FiShoppingBag, 
-  Users as FiUsers, 
-  LogOut, 
-  FolderOpen, 
-  Settings, 
+import {
+  LayoutDashboard as RxDashboard,
+  Package,
+  Package as FiPackage,
+  ShoppingBag as FiShoppingBag,
+  Users as FiUsers,
+  LogOut,
+  FolderOpen,
+  Settings,
   ArrowLeft,
   Menu,
   X
@@ -27,7 +27,7 @@ const AdminLayout = ({ children }) => {
       {/* Mobile Header */}
       <header className="admin-mobile-header">
         <Link to="/" className="admin-sidebar-logo">
-          <Package size={24} /> NaturaDry
+          <Package size={24} /> KarakoramStore
         </Link>
         <button onClick={toggleSidebar} className="mobile-toggle">
           {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
@@ -44,7 +44,7 @@ const AdminLayout = ({ children }) => {
         {/* Logo Section */}
         <div className="admin-sidebar-header">
           <Link to="/" className="admin-sidebar-logo">
-            <Package size={28} /> NaturaDry
+            <Package size={28} /> KarakoramStore
           </Link>
           <div className="text-emerald-300 text-xs mt-1">Admin Panel</div>
         </div>

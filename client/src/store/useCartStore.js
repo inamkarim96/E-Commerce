@@ -11,10 +11,10 @@ export const useCartStore = create(
 
       addToCart: (product, quantity = 1, weight = null) => {
         const weightLabel = typeof weight === 'string' ? weight : (weight?.label || 'Default');
-        
+
         set((state) => {
-          const existingItem = state.cart.find(item => 
-            item.id === product.id && 
+          const existingItem = state.cart.find(item =>
+            item.id === product.id &&
             (item.selectedWeight?.label === weightLabel || item.selectedWeight === weightLabel)
           );
 
@@ -27,7 +27,7 @@ export const useCartStore = create(
               )
             };
           }
-          
+
           const price = weight?.price || product.base_price;
           return {
             cart: [...state.cart, { ...product, quantity, selectedWeight: weight || weightLabel, price }]
@@ -38,7 +38,7 @@ export const useCartStore = create(
       removeFromCart: (productId, weight) => {
         const weightLabel = typeof weight === 'string' ? weight : (weight?.label || 'Default');
         set((state) => ({
-          cart: state.cart.filter(item => 
+          cart: state.cart.filter(item =>
             !(item.id === productId && (item.selectedWeight?.label === weightLabel || item.selectedWeight === weightLabel))
           )
         }));
@@ -57,13 +57,13 @@ export const useCartStore = create(
       },
 
       clearCart: () => set({ cart: [] }),
-      
+
       getTotalItems: () => get().cart.reduce((total, item) => total + item.quantity, 0),
-      
+
       getSubtotal: () => get().cart.reduce((total, item) => total + (item.price * item.quantity), 0)
     }),
     {
-      name: 'naturadry-cart-storage',
+      name: 'KarakoramStore-cart-storage',
     }
   )
 );

@@ -17,7 +17,7 @@ const CLOUDINARY_BASE = 'https://res.cloudinary.com';
  * @returns {string} Optimized image URL
  */
 export function getOptimizedImageUrl(url, options = {}) {
-  const PLACEHOLDER = 'https://res.cloudinary.com/dcwpuw2ca/image/upload/f_auto,q_auto,w_600/naturadry/placeholder';
+  const PLACEHOLDER = 'https://res.cloudinary.com/dcwpuw2ca/image/upload/f_auto,q_auto,w_600/KarakoramStore/placeholder';
 
   if (!url || typeof url !== 'string') return PLACEHOLDER;
 
